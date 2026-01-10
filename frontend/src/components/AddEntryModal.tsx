@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { getWealthSources, saveWealthSnapshot, type WealthSource } from '../api';
 import type { WealthEntry } from '../utils/dataUtils';
+import { MONTHS } from '../utils/constants';
 
 interface AddEntryModalProps {
     isOpen: boolean;
@@ -31,7 +32,6 @@ export const AddEntryModal: React.FC<AddEntryModalProps> = ({ isOpen, onClose, o
         }
     }, [isOpen]);
 
-    // Auto-populate values when month/year changes
     useEffect(() => {
         const existing = existingEntries.find(
             e => e.month === formData.month && e.year === Number(formData.year)
@@ -39,43 +39,27 @@ export const AddEntryModal: React.FC<AddEntryModalProps> = ({ isOpen, onClose, o
 
         if (existing) {
             const newValues: Record<string, string> = {};
-            // Copy existing values as strings
             Object.entries(existing.values).forEach(([id, val]) => {
                 newValues[id] = val.toString();
             });
-            // Ensure all sources have a value (fill missing with empty/zero if source added later)
             sources.forEach(s => {
                 if (newValues[s.id] === undefined) {
                     newValues[s.id] = '';
                 }
             });
-
             setFormData(prev => ({ ...prev, values: newValues }));
         } else {
-            // Reset to empty if no entry exists for this month
-            // Only if we just switched to a new empty month. 
-            // We don't want to clear user input if they are typing, but this effect runs on month/year change.
-            // So yes, switching to a new month should imply starting fresh or previous month carry-over.
-            // Requirement is "if a month that has already been entered is selected... updated...". 
-            // It implies if I select a NEW month, it should probably be empty? Or keep current inputs?
-            // Usually form reset is safer to avoid accidental saving of wrong month data.
-            // But we should only reset if the dependencies changed.
-
             const emptyValues: Record<string, string> = {};
             sources.forEach(s => emptyValues[s.id] = '');
             setFormData(prev => ({ ...prev, values: emptyValues }));
         }
-    }, [formData.month, formData.year, existingEntries, sources]); // Include sources to ensure we key correctly
+    }, [formData.month, formData.year, existingEntries, sources]);
 
     const fetchSources = async () => {
         try {
             setLoading(true);
             const data = await getWealthSources();
             setSources(data);
-
-            // Note: The Effect above will handle initialization if we include 'sources' in dependency and trigger it.
-            // But fetchSources also ran on Open.
-
         } catch (error) {
             console.error('Failed to fetch sources', error);
         } finally {
@@ -101,7 +85,6 @@ export const AddEntryModal: React.FC<AddEntryModalProps> = ({ isOpen, onClose, o
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Convert string values to numbers
         const numericValues: Record<string, number> = {};
         Object.entries(formData.values).forEach(([id, val]) => {
             numericValues[id] = Number(val) || 0;
@@ -123,10 +106,8 @@ export const AddEntryModal: React.FC<AddEntryModalProps> = ({ isOpen, onClose, o
         }
     };
 
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const years = [currentYear - 1, currentYear, currentYear + 1];
 
-    // Group sources by category for better UX
     const cashSources = sources.filter(s => s.category === 'cash');
     const investmentSources = sources.filter(s => s.category === 'investment');
     const pensionSources = sources.filter(s => s.category === 'pension');
@@ -151,7 +132,7 @@ export const AddEntryModal: React.FC<AddEntryModalProps> = ({ isOpen, onClose, o
                                 onChange={handleChange}
                                 className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                             >
-                                {months.map(m => <option key={m} value={m}>{m}</option>)}
+                                {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
                             </select>
                         </div>
                         <div className="space-y-2">

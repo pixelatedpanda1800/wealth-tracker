@@ -1,7 +1,9 @@
-export const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+import { MONTHS } from './constants';
+import type { Month } from './constants';
 
 export interface WealthEntry {
-    month: string;
+    id?: string;
+    month: Month;
     year: number;
     values: Record<string, number>;
     isEstimate?: boolean;
@@ -40,7 +42,7 @@ export const processWealthData = (data: WealthEntry[], sources: WealthSource[], 
     // Sort data chronologically
     const sortedData = [...data].sort((a, b) => {
         if (a.year !== b.year) return a.year - b.year;
-        return months.indexOf(a.month) - months.indexOf(b.month);
+        return MONTHS.indexOf(a.month) - MONTHS.indexOf(b.month);
     });
 
     // Helper to calculate aggregations for an entry
@@ -95,7 +97,7 @@ export const processWealthData = (data: WealthEntry[], sources: WealthSource[], 
             const aggregated = aggregateEntry(existing);
             result.push({
                 ...aggregated,
-                month: isCustomLabel ? monthLabel : existing.month, // Override if custom label
+                month: (isCustomLabel ? monthLabel : existing.month) as Month, // Override if custom label
                 year: year || existing.year,
                 isEstimate: false
             });
@@ -106,7 +108,7 @@ export const processWealthData = (data: WealthEntry[], sources: WealthSource[], 
             if (lastKnown && lastKnown.total !== undefined) {
                 result.push({
                     ...lastKnown,
-                    month: monthLabel,
+                    month: monthLabel as Month,
                     year: year,
                     isEstimate: true
                 });
@@ -114,7 +116,7 @@ export const processWealthData = (data: WealthEntry[], sources: WealthSource[], 
                 // Search before window in sortedData
                 const beforeWindow = [...sortedData].reverse().find(d => {
                     if (isCustomLabel) return true;
-                    return d.year < year || (d.year === year && months.indexOf(d.month) < months.indexOf(monthLabel));
+                    return d.year < year || (d.year === year && MONTHS.indexOf(d.month) < MONTHS.indexOf(monthLabel as Month));
                 });
 
                 const fallback = beforeWindow || sortedData[sortedData.length - 1];
@@ -123,13 +125,13 @@ export const processWealthData = (data: WealthEntry[], sources: WealthSource[], 
                     const aggregated = aggregateEntry(fallback);
                     result.push({
                         ...aggregated,
-                        month: monthLabel,
+                        month: monthLabel as Month,
                         year: year,
                         isEstimate: true
                     });
                 } else {
                     result.push({
-                        month: monthLabel,
+                        month: monthLabel as Month,
                         year: year,
                         values: {},
                         cash: 0,
@@ -148,7 +150,7 @@ export const processWealthData = (data: WealthEntry[], sources: WealthSource[], 
         let endYear = currentRealYear;
 
         if (latestData) {
-            const latestIdx = months.indexOf(latestData.month);
+            const latestIdx = MONTHS.indexOf(latestData.month);
             if (latestData.year > endYear || (latestData.year === endYear && latestIdx > endMonthIdx)) {
                 endMonthIdx = latestIdx;
                 endYear = latestData.year;
@@ -159,9 +161,9 @@ export const processWealthData = (data: WealthEntry[], sources: WealthSource[], 
         let currentMonthIdx = endMonthIdx;
         let currentYear = endYear;
 
-        const targetLabels: { month: string, year: number }[] = [];
+        const targetLabels: { month: Month, year: number }[] = [];
         for (let i = 0; i < 12; i++) {
-            targetLabels.unshift({ month: months[currentMonthIdx], year: currentYear });
+            targetLabels.unshift({ month: MONTHS[currentMonthIdx], year: currentYear });
             currentMonthIdx--;
             if (currentMonthIdx < 0) {
                 currentMonthIdx = 11;
@@ -181,7 +183,7 @@ export const processWealthData = (data: WealthEntry[], sources: WealthSource[], 
         let targetFY = fq.year;
 
         if (latestData) {
-            const lIdx = months.indexOf(latestData.month);
+            const lIdx = MONTHS.indexOf(latestData.month);
             const lFq = getFinancialQuarter(lIdx, latestData.year);
             if (lFq.year > targetFY || (lFq.year === targetFY && lFq.q > targetQ)) {
                 targetQ = lFq.q;
@@ -207,7 +209,7 @@ export const processWealthData = (data: WealthEntry[], sources: WealthSource[], 
             let match = null;
             for (let i = 2; i >= 0; i--) {
                 const search = qMonths[i];
-                const found = sortedData.find(d => months.indexOf(d.month) === search.m && d.year === search.y);
+                const found = sortedData.find(d => MONTHS.indexOf(d.month) === search.m && d.year === search.y);
                 if (found) {
                     match = found;
                     break;
@@ -224,7 +226,7 @@ export const processWealthData = (data: WealthEntry[], sources: WealthSource[], 
         let targetFY = getFinancialQuarter(currentRealMonthIdx, currentRealYear).year;
 
         if (latestData) {
-            const lFq = getFinancialQuarter(months.indexOf(latestData.month), latestData.year);
+            const lFq = getFinancialQuarter(MONTHS.indexOf(latestData.month), latestData.year);
             if (lFq.year > targetFY) targetFY = lFq.year;
         }
 
@@ -235,9 +237,9 @@ export const processWealthData = (data: WealthEntry[], sources: WealthSource[], 
 
         years.forEach(fy => {
             const candidates = sortedData.filter(d => {
-                const mIdx = months.indexOf(d.month);
-                if (d.year === fy + 1 && mIdx <= 2) return true; // Jan-Mar next year
-                if (d.year === fy && mIdx >= 3) return true; // Apr-Dec this year
+                const mIndex = MONTHS.indexOf(d.month);
+                if (d.year === fy + 1 && mIndex <= 2) return true; // Jan-Mar next year
+                if (d.year === fy && mIndex >= 3) return true; // Apr-Dec this year
                 return false;
             });
 
@@ -249,12 +251,12 @@ export const processWealthData = (data: WealthEntry[], sources: WealthSource[], 
     // FILTER: Remove any entries strictly before the earliest recorded data
     if (sortedData.length > 0) {
         const earliest = sortedData[0];
-        const earliestTime = earliest.year * 12 + months.indexOf(earliest.month);
+        const earliestTime = earliest.year * 12 + MONTHS.indexOf(earliest.month);
 
         return result.filter(d => {
             let entryTime = 0;
             if (mode === 'monthly') {
-                entryTime = d.year * 12 + months.indexOf(d.month);
+                entryTime = d.year * 12 + MONTHS.indexOf(d.month as Month);
             } else if (mode === 'quarterly') {
                 const qMatch = d.month.match(/Q(\d)/);
                 const q = qMatch ? parseInt(qMatch[1]) : 4;

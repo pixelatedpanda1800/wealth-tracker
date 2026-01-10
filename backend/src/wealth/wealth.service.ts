@@ -15,7 +15,9 @@ export class WealthService {
     ) { }
 
     async findAllSnapshots(): Promise<WealthSnapshot[]> {
-        const snapshots = await this.wealthRepository.find();
+        const snapshots = await this.wealthRepository.find({
+            order: { year: 'ASC' },
+        });
 
         // Sort chronologically: year then month
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

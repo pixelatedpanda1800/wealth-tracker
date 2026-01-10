@@ -8,7 +8,7 @@ export interface WealthSource {
     color?: string;
 }
 
-const API_URL = 'http://localhost:3000';
+const API_URL = '/api';
 
 const api = axios.create({
     baseURL: API_URL,

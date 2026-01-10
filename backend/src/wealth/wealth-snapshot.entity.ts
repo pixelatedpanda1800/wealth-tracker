@@ -12,8 +12,8 @@ export class WealthSnapshot {
     @Column({ length: 3 })
     month: string;
 
-    // Use simple-json for SQLite compatibility
-    @Column('simple-json', { default: '{}' })
+    // Use jsonb for Postgres optimization
+    @Column({ type: 'jsonb', default: {} })
     values: Record<string, number>;
 
     // We can keeps these for backward compatibility during migration, 
