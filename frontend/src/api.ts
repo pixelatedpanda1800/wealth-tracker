@@ -42,3 +42,18 @@ export const updateWealthSource = async (id: string, data: Partial<WealthSource>
 export const deleteWealthSource = async (id: string): Promise<void> => {
     await api.delete(`/wealth/sources/${id}`);
 };
+
+export const exportData = async (): Promise<string> => {
+    const response = await api.get<{ csv: string }>('/wealth/export');
+    return response.data.csv;
+};
+
+export interface ImportResult {
+    rowsProcessed: number;
+    newSources: string[];
+}
+
+export const importData = async (csv: string): Promise<ImportResult> => {
+    const response = await api.post<ImportResult>('/wealth/import', { csv });
+    return response.data;
+};

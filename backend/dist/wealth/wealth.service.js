@@ -26,7 +26,9 @@ let WealthService = class WealthService {
         this.sourceRepository = sourceRepository;
     }
     async findAllSnapshots() {
-        const snapshots = await this.wealthRepository.find();
+        const snapshots = await this.wealthRepository.find({
+            order: { year: 'ASC' },
+        });
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         return snapshots.sort((a, b) => {
             if (a.year !== b.year)
@@ -61,6 +63,82 @@ let WealthService = class WealthService {
     async updateSource(id, data) {
         await this.sourceRepository.update(id, data);
         return this.sourceRepository.findOneBy({ id });
+    }
+    async exportToCsv() {
+        const sources = await this.findAllSources();
+        const snapshots = await this.findAllSnapshots();
+        const headers = ['Year', 'Month', ...sources.map(s => s.name)];
+        const rows = [headers.join(',')];
+        for (const snapshot of snapshots) {
+            const values = sources.map(s => {
+                const val = snapshot.values?.[s.id];
+                return val !== undefined ? val.toString() : '';
+            });
+            rows.push([snapshot.year.toString(), snapshot.month, ...values].join(','));
+        }
+        return rows.join('\n');
+    }
+    async importFromCsv(csvData) {
+        const lines = csvData.trim().split('\n').map(l => l.trim()).filter(l => l);
+        if (lines.length < 2) {
+            return { rowsProcessed: 0, newSources: [] };
+        }
+        const headerLine = lines[0];
+        const headers = this.parseCsvLine(headerLine);
+        const sourceNames = headers.slice(2);
+        const existingSources = await this.findAllSources();
+        const sourceMap = {};
+        const newSources = [];
+        for (const name of sourceNames) {
+            const existing = existingSources.find(s => s.name.toLowerCase() === name.toLowerCase());
+            if (existing) {
+                sourceMap[name] = existing.id;
+            }
+            else {
+                const created = await this.createSource({ name, category: 'cash' });
+                sourceMap[name] = created.id;
+                newSources.push(name);
+            }
+        }
+        let rowsProcessed = 0;
+        for (let i = 1; i < lines.length; i++) {
+            const cols = this.parseCsvLine(lines[i]);
+            if (cols.length < 2)
+                continue;
+            const year = parseInt(cols[0], 10);
+            const month = cols[1];
+            if (isNaN(year) || !month)
+                continue;
+            const values = {};
+            for (let j = 0; j < sourceNames.length; j++) {
+                const val = parseFloat(cols[j + 2] || '0');
+                if (!isNaN(val)) {
+                    values[sourceMap[sourceNames[j]]] = val;
+                }
+            }
+            await this.createOrUpdateSnapshot({ year, month, values });
+            rowsProcessed++;
+        }
+        return { rowsProcessed, newSources };
+    }
+    parseCsvLine(line) {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+        for (const char of line) {
+            if (char === '"') {
+                inQuotes = !inQuotes;
+            }
+            else if (char === ',' && !inQuotes) {
+                result.push(current.trim());
+                current = '';
+            }
+            else {
+                current += char;
+            }
+        }
+        result.push(current.trim());
+        return result;
     }
 };
 exports.WealthService = WealthService;

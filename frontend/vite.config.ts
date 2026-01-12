@@ -8,4 +8,13 @@ export default defineConfig({
     react(),
     tailwindhouse(),
   ],
+  server: {
+    proxy: {
+      // Forward /api requests to the backend during local development
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+    },
+  },
 })

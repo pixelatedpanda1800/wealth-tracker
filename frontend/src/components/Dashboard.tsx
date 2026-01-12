@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { WealthChart } from './WealthChart';
+import { ProjectionChart } from './ProjectionChart';
 import { Wallet, TrendingUp, Landmark, Plus, Settings } from 'lucide-react';
 import { AddEntryModal } from './AddEntryModal';
 import { WealthSourcesModal } from './WealthSourcesModal';
@@ -127,6 +128,8 @@ export const Dashboard: React.FC = () => {
                 </section>
 
                 <HistoryGrid data={data} sources={sources} />
+
+                <ProjectionChart data={rawSnapshots} sources={sources} />
             </div>
 
             <AddEntryModal

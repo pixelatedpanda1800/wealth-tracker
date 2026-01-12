@@ -273,3 +273,160 @@ export const processWealthData = (data: WealthEntry[], sources: WealthSource[], 
 
     return result;
 };
+
+export type ProjectionTimeline = 'monthly' | 'quarterly' | 'yearly';
+
+export interface ProjectionEntry {
+    label: string;
+    value: number;
+    isProjection: boolean;
+}
+
+/**
+ * Calculate future wealth projections based on historical trend.
+ * Uses a simple linear average of monthly changes.
+ */
+export const calculateProjections = (
+    data: WealthEntry[],
+    sources: WealthSource[],
+    timeline: ProjectionTimeline,
+    sourceId?: string // undefined = total wealth
+): ProjectionEntry[] => {
+    if (data.length === 0) return [];
+
+    // Process the raw data to get aggregated totals
+    const processed = processWealthData(data, sources, 'monthly');
+    const actualData = processed.filter(e => !e.isEstimate);
+
+    if (actualData.length === 0) return [];
+
+    // Get the value for a specific entry
+    const getValue = (entry: WealthEntry): number => {
+        if (sourceId) {
+            return entry.values?.[sourceId] || 0;
+        }
+        return entry.total || 0;
+    };
+
+    // Calculate average monthly growth from actual data
+    let totalGrowth = 0;
+    let growthCount = 0;
+    for (let i = 1; i < actualData.length; i++) {
+        const prev = getValue(actualData[i - 1]);
+        const curr = getValue(actualData[i]);
+        totalGrowth += curr - prev;
+        growthCount++;
+    }
+    const avgMonthlyGrowth = growthCount > 0 ? totalGrowth / growthCount : 0;
+
+    const now = new Date();
+    const currentMonthIdx = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    const result: ProjectionEntry[] = [];
+    const latestValue = getValue(actualData[actualData.length - 1]);
+    const latestEntry = actualData[actualData.length - 1];
+    const latestMonthIdx = MONTHS.indexOf(latestEntry.month);
+    const latestYear = latestEntry.year;
+
+    if (timeline === 'monthly') {
+        // -2 months history + current + 12 months future
+        let startMonthIdx = currentMonthIdx - 2;
+        let startYear = currentYear;
+        if (startMonthIdx < 0) {
+            startMonthIdx += 12;
+            startYear--;
+        }
+
+        for (let i = 0; i < 15; i++) { // 2 past + 1 current + 12 future
+            let mIdx = startMonthIdx + i;
+            let y = startYear;
+            while (mIdx > 11) { mIdx -= 12; y++; }
+
+            const label = `${MONTHS[mIdx]} '${y.toString().slice(-2)}`;
+            const isCurrentOrPast = y < currentYear || (y === currentYear && mIdx <= currentMonthIdx);
+
+            // Try to find actual data
+            const found = processed.find(d => MONTHS.indexOf(d.month) === mIdx && d.year === y && !d.isEstimate);
+            if (found) {
+                result.push({ label, value: getValue(found), isProjection: false });
+            } else if (isCurrentOrPast) {
+                // Forward fill from last known
+                const lastKnown = result.length > 0 ? result[result.length - 1].value : latestValue;
+                result.push({ label, value: lastKnown, isProjection: false });
+            } else {
+                // Calculate projection
+                const monthsFromLatest = (y - latestYear) * 12 + (mIdx - latestMonthIdx);
+                const projected = latestValue + (avgMonthlyGrowth * monthsFromLatest);
+                result.push({ label, value: Math.max(0, projected), isProjection: true });
+            }
+        }
+    } else if (timeline === 'quarterly') {
+        // -1 quarter history + current + 5 years future (20 quarters)
+        const getQuarter = (mIdx: number) => Math.floor(mIdx / 3) + 1;
+        const currentQ = getQuarter(currentMonthIdx);
+
+        let startQ = currentQ - 1;
+        let startY = currentYear;
+        if (startQ < 1) { startQ = 4; startY--; }
+
+        for (let i = 0; i < 22; i++) { // 1 past + 1 current + 20 future
+            let q = startQ + i;
+            let y = startY;
+            while (q > 4) { q -= 4; y++; }
+
+            const label = `Q${q} '${y.toString().slice(-2)}`;
+            const qEndMonth = q * 3 - 1; // Q1->2 (Mar), Q2->5 (Jun), etc
+            const isCurrentOrPast = y < currentYear || (y === currentYear && qEndMonth <= currentMonthIdx);
+
+            if (isCurrentOrPast) {
+                // Find last month of quarter in actual data
+                const qMonths = [q * 3 - 3, q * 3 - 2, q * 3 - 1];
+                let found = null;
+                for (let j = 2; j >= 0; j--) {
+                    const check = processed.find(d => MONTHS.indexOf(d.month) === qMonths[j] && d.year === y && !d.isEstimate);
+                    if (check) { found = check; break; }
+                }
+                if (found) {
+                    result.push({ label, value: getValue(found), isProjection: false });
+                } else {
+                    const lastKnown = result.length > 0 ? result[result.length - 1].value : latestValue;
+                    result.push({ label, value: lastKnown, isProjection: false });
+                }
+            } else {
+                const monthsFromLatest = (y - latestYear) * 12 + (qEndMonth - latestMonthIdx);
+                const projected = latestValue + (avgMonthlyGrowth * monthsFromLatest);
+                result.push({ label, value: Math.max(0, projected), isProjection: true });
+            }
+        }
+    } else if (timeline === 'yearly') {
+        // -1 year history + current + 10 years future
+        for (let i = -1; i <= 10; i++) {
+            const y = currentYear + i;
+            const label = `${y}`;
+            const isCurrentOrPast = y <= currentYear;
+
+            if (isCurrentOrPast) {
+                // Find Dec of that year (or latest if current year)
+                const targetMonth = y === currentYear ? currentMonthIdx : 11;
+                let found = null;
+                for (let mIdx = targetMonth; mIdx >= 0; mIdx--) {
+                    const check = processed.find(d => MONTHS.indexOf(d.month) === mIdx && d.year === y && !d.isEstimate);
+                    if (check) { found = check; break; }
+                }
+                if (found) {
+                    result.push({ label, value: getValue(found), isProjection: false });
+                } else {
+                    const lastKnown = result.length > 0 ? result[result.length - 1].value : latestValue;
+                    result.push({ label, value: lastKnown, isProjection: false });
+                }
+            } else {
+                const monthsFromLatest = (y - latestYear) * 12 + (11 - latestMonthIdx); // Project to Dec
+                const projected = latestValue + (avgMonthlyGrowth * monthsFromLatest);
+                result.push({ label, value: Math.max(0, projected), isProjection: true });
+            }
+        }
+    }
+
+    return result;
+};

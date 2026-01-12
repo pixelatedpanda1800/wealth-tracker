@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { X, Trash2, Plus, Loader2, Pencil, Check } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Trash2, Plus, Loader2, Pencil, Check, Download, Upload, AlertTriangle } from 'lucide-react';
 import { clsx } from 'clsx';
-import { getWealthSources, createWealthSource, updateWealthSource, deleteWealthSource, type WealthSource } from '../api';
+import { getWealthSources, createWealthSource, updateWealthSource, deleteWealthSource, exportData, importData, type WealthSource, type ImportResult } from '../api';
 import { sortSources, getDefaultColor } from '../utils/dataUtils';
 
 interface WealthSourcesModalProps {
@@ -41,6 +41,14 @@ export const WealthSourcesModal: React.FC<WealthSourcesModalProps> = ({ isOpen, 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
     const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
+
+    // CSV Import/Export State
+    const [showImportConfirm, setShowImportConfirm] = useState(false);
+    const [pendingCsv, setPendingCsv] = useState<string | null>(null);
+    const [importResult, setImportResult] = useState<ImportResult | null>(null);
+    const [isExporting, setIsExporting] = useState(false);
+    const [isImporting, setIsImporting] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (isOpen) {
@@ -153,6 +161,58 @@ export const WealthSourcesModal: React.FC<WealthSourcesModalProps> = ({ isOpen, 
     // Sort to determine default colors
     const fullSortedSources = sortSources(sources);
 
+    const handleBackup = async () => {
+        try {
+            setIsExporting(true);
+            const csv = await exportData();
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `wealth-backup-${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Failed to export data', error);
+            alert('Failed to export data');
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const csv = event.target?.result as string;
+            setPendingCsv(csv);
+            setShowImportConfirm(true);
+        };
+        reader.readAsText(file);
+        e.target.value = ''; // Reset for re-upload
+    };
+
+    const handleConfirmImport = async () => {
+        if (!pendingCsv) return;
+
+        try {
+            setIsImporting(true);
+            const result = await importData(pendingCsv);
+            setImportResult(result);
+            setShowImportConfirm(false);
+            setPendingCsv(null);
+            await fetchSources();
+            onSourcesChanged();
+        } catch (error) {
+            console.error('Failed to import data', error);
+            alert('Failed to import data');
+        } finally {
+            setIsImporting(false);
+        }
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -164,6 +224,83 @@ export const WealthSourcesModal: React.FC<WealthSourcesModalProps> = ({ isOpen, 
                         <X size={20} />
                     </button>
                 </div>
+
+                {/* Backup / Import Buttons */}
+                <div className="flex gap-3 p-4 border-b border-slate-100 bg-slate-50/50">
+                    <button
+                        onClick={handleBackup}
+                        disabled={isExporting}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                    >
+                        {isExporting ? <Loader2 className="animate-spin" size={18} /> : <Download size={18} />}
+                        Backup
+                    </button>
+                    <input
+                        type="file"
+                        accept=".csv"
+                        ref={fileInputRef}
+                        onChange={handleFileSelect}
+                        className="hidden"
+                    />
+                    <button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isImporting}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-50 text-rose-700 border border-rose-100 font-medium hover:bg-rose-100 transition-colors disabled:opacity-50"
+                    >
+                        {isImporting ? <Loader2 className="animate-spin" size={18} /> : <Upload size={18} />}
+                        Import Data
+                    </button>
+                </div>
+
+                {/* Import Confirmation Modal */}
+                {showImportConfirm && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm rounded-2xl">
+                        <div className="bg-white rounded-xl shadow-lg p-6 m-6 max-w-sm space-y-4">
+                            <div className="flex items-center gap-3 text-amber-600">
+                                <AlertTriangle size={24} />
+                                <h3 className="text-lg font-bold">Confirm Import</h3>
+                            </div>
+                            <p className="text-slate-600 text-sm">
+                                Importing data will <strong>overwrite</strong> any existing records for the same month/year. Are you sure you want to proceed?
+                            </p>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => { setShowImportConfirm(false); setPendingCsv(null); }}
+                                    className="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleConfirmImport}
+                                    disabled={isImporting}
+                                    className="flex-1 px-4 py-2 rounded-lg bg-amber-500 text-white font-medium hover:bg-amber-600 transition-colors disabled:opacity-50"
+                                >
+                                    {isImporting ? <Loader2 className="animate-spin mx-auto" size={18} /> : 'Proceed'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Import Result Summary */}
+                {importResult && (
+                    <div className="p-4 bg-emerald-50 border-b border-emerald-100">
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <p className="font-medium text-emerald-700">Import Complete</p>
+                                <p className="text-sm text-emerald-600">{importResult.rowsProcessed} row(s) processed.</p>
+                                {importResult.newSources.length > 0 && (
+                                    <p className="text-sm text-amber-600 mt-1">
+                                        <strong>New sources created as 'Cash':</strong> {importResult.newSources.join(', ')}. Update their category in the list below if needed.
+                                    </p>
+                                )}
+                            </div>
+                            <button onClick={() => setImportResult(null)} className="text-emerald-500 hover:text-emerald-700">
+                                <X size={18} />
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
                     {/* Add/Edit Form */}

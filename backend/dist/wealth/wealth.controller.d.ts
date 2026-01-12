@@ -10,4 +10,13 @@ export declare class WealthController {
     createSource(data: any): Promise<import("./wealth-source.entity").WealthSource>;
     updateSource(id: string, data: any): Promise<import("./wealth-source.entity").WealthSource | null>;
     removeSource(id: string): Promise<void>;
+    exportCsv(): Promise<{
+        csv: string;
+    }>;
+    importCsv(body: {
+        csv: string;
+    }): Promise<{
+        rowsProcessed: number;
+        newSources: string[];
+    }>;
 }

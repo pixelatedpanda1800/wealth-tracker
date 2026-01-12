@@ -13,4 +13,10 @@ export declare class WealthService {
     createSource(data: Partial<WealthSource>): Promise<WealthSource>;
     removeSource(id: string): Promise<void>;
     updateSource(id: string, data: Partial<WealthSource>): Promise<WealthSource | null>;
+    exportToCsv(): Promise<string>;
+    importFromCsv(csvData: string): Promise<{
+        rowsProcessed: number;
+        newSources: string[];
+    }>;
+    private parseCsvLine;
 }

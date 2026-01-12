@@ -14,7 +14,7 @@ import { WealthSource } from './wealth/wealth-source.entity';
     }),
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'client'),
-      exclude: ['/api/(.*)'],
+      exclude: ['/api{/*path}'],
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],

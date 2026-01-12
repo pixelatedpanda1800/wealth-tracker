@@ -10,6 +10,8 @@ exports.AppModule = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const typeorm_1 = require("@nestjs/typeorm");
+const serve_static_1 = require("@nestjs/serve-static");
+const path_1 = require("path");
 const wealth_module_1 = require("./wealth/wealth.module");
 const wealth_snapshot_entity_1 = require("./wealth/wealth-snapshot.entity");
 const wealth_source_entity_1 = require("./wealth/wealth-source.entity");
@@ -22,11 +24,34 @@ exports.AppModule = AppModule = __decorate([
             config_1.ConfigModule.forRoot({
                 isGlobal: true,
             }),
-            typeorm_1.TypeOrmModule.forRoot({
-                type: 'sqlite',
-                database: 'wealth.sqlite',
-                entities: [wealth_snapshot_entity_1.WealthSnapshot, wealth_source_entity_1.WealthSource],
-                synchronize: true,
+            serve_static_1.ServeStaticModule.forRoot({
+                rootPath: (0, path_1.join)(__dirname, '..', 'client'),
+                exclude: ['/api{/*path}'],
+            }),
+            typeorm_1.TypeOrmModule.forRootAsync({
+                imports: [config_1.ConfigModule],
+                inject: [config_1.ConfigService],
+                useFactory: (configService) => {
+                    const dbHost = configService.get('DB_HOST');
+                    if (dbHost) {
+                        return {
+                            type: 'postgres',
+                            host: dbHost,
+                            port: configService.get('DB_PORT', 5432),
+                            username: configService.get('DB_USERNAME', 'postgres'),
+                            password: configService.get('DB_PASSWORD', 'postgres'),
+                            database: configService.get('DB_DATABASE', 'wealth_tracker'),
+                            entities: [wealth_snapshot_entity_1.WealthSnapshot, wealth_source_entity_1.WealthSource],
+                            synchronize: true,
+                        };
+                    }
+                    return {
+                        type: 'sqlite',
+                        database: 'wealth.sqlite',
+                        entities: [wealth_snapshot_entity_1.WealthSnapshot, wealth_source_entity_1.WealthSource],
+                        synchronize: true,
+                    };
+                },
             }),
             wealth_module_1.WealthModule,
         ],

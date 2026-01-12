@@ -42,6 +42,13 @@ let WealthController = class WealthController {
     removeSource(id) {
         return this.wealthService.removeSource(id);
     }
+    async exportCsv() {
+        const csv = await this.wealthService.exportToCsv();
+        return { csv };
+    }
+    async importCsv(body) {
+        return this.wealthService.importFromCsv(body.csv);
+    }
 };
 exports.WealthController = WealthController;
 __decorate([
@@ -93,6 +100,19 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], WealthController.prototype, "removeSource", null);
+__decorate([
+    (0, common_1.Get)('export'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], WealthController.prototype, "exportCsv", null);
+__decorate([
+    (0, common_1.Post)('import'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], WealthController.prototype, "importCsv", null);
 exports.WealthController = WealthController = __decorate([
     (0, common_1.Controller)('wealth'),
     __metadata("design:paramtypes", [wealth_service_1.WealthService])
