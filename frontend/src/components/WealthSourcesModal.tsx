@@ -165,6 +165,32 @@ export const WealthSourcesModal: React.FC<WealthSourcesModalProps> = ({ isOpen, 
         try {
             setIsExporting(true);
             const csv = await exportData();
+
+            // Try File System Access API for "Save As" functionality
+            try {
+                if ('showSaveFilePicker' in window) {
+                    const opts = {
+                        suggestedName: `wealth-backup-${new Date().toISOString().slice(0, 10)}.csv`,
+                        types: [{
+                            description: 'CSV File',
+                            accept: { 'text/csv': ['.csv'] },
+                        }],
+                    };
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const handle = await (window as any).showSaveFilePicker(opts);
+                    const writable = await handle.createWritable();
+                    await writable.write(csv);
+                    await writable.close();
+                    return;
+                }
+            } catch (err: any) {
+                // If user cancels the picker, it throws an AbortError - we should stop here
+                if (err.name === 'AbortError') return;
+                // For other errors, fall back to default download
+                console.warn('File System Access API failed, falling back to download', err);
+            }
+
+            // Fallback: Default browser download
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
