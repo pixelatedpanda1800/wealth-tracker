@@ -296,9 +296,6 @@ export const calculateProjections = (
 
     // Process the raw data to get aggregated totals
     const processed = processWealthData(data, sources, 'monthly');
-    const actualData = processed.filter(e => !e.isEstimate);
-
-    if (actualData.length === 0) return [];
 
     // Get the value for a specific entry
     const getValue = (entry: WealthEntry): number => {
@@ -308,24 +305,52 @@ export const calculateProjections = (
         return entry.total || 0;
     };
 
-    // Calculate average monthly growth from actual data
-    let totalGrowth = 0;
-    let growthCount = 0;
-    for (let i = 1; i < actualData.length; i++) {
-        const prev = getValue(actualData[i - 1]);
-        const curr = getValue(actualData[i]);
-        totalGrowth += curr - prev;
-        growthCount++;
+    // 1. Filter out leading zeros (before the first real value)
+    // 2. We DO NOT filter out isEstimate so that gaps (which default to flat/previous value) 
+    //    contribute 0 growth to the average, dampening the trend as requested.
+    let firstRealIndex = -1;
+    for (let i = 0; i < processed.length; i++) {
+        if (getValue(processed[i]) > 0 && !processed[i].isEstimate) {
+            firstRealIndex = i;
+            break;
+        }
     }
-    const avgMonthlyGrowth = growthCount > 0 ? totalGrowth / growthCount : 0;
+
+    // If no real data found, return empty
+    if (firstRealIndex === -1) return [];
+
+    const historyData = processed.slice(firstRealIndex);
+
+    // Calculate monthly changes for the last 12 months (or available history)
+    const changes: number[] = [];
+    const lookbackStart = Math.max(1, historyData.length - 12);
+
+    for (let i = lookbackStart; i < historyData.length; i++) {
+        const prev = getValue(historyData[i - 1]);
+        const curr = getValue(historyData[i]);
+        changes.push(curr - prev);
+    }
+
+    // Use Median to filter out outliers (like one-off deposits)
+    changes.sort((a, b) => a - b);
+    let avgMonthlyGrowth = 0;
+
+    if (changes.length > 0) {
+        const mid = Math.floor(changes.length / 2);
+        if (changes.length % 2 !== 0) {
+            avgMonthlyGrowth = changes[mid];
+        } else {
+            avgMonthlyGrowth = (changes[mid - 1] + changes[mid]) / 2;
+        }
+    }
 
     const now = new Date();
     const currentMonthIdx = now.getMonth();
     const currentYear = now.getFullYear();
 
     const result: ProjectionEntry[] = [];
-    const latestValue = getValue(actualData[actualData.length - 1]);
-    const latestEntry = actualData[actualData.length - 1];
+    const latestValue = getValue(historyData[historyData.length - 1]);
+    const latestEntry = historyData[historyData.length - 1];
     const latestMonthIdx = MONTHS.indexOf(latestEntry.month);
     const latestYear = latestEntry.year;
 
@@ -421,7 +446,10 @@ export const calculateProjections = (
                     result.push({ label, value: lastKnown, isProjection: false });
                 }
             } else {
-                const monthsFromLatest = (y - latestYear) * 12 + (11 - latestMonthIdx); // Project to Dec
+                // Calculate projection
+                // Use the same month as the latest data for yearly intervals (12-month)
+                // instead of jumping to December (which could be 23 months if latest is Jan)
+                const monthsFromLatest = (y - latestYear) * 12;
                 const projected = latestValue + (avgMonthlyGrowth * monthsFromLatest);
                 result.push({ label, value: Math.max(0, projected), isProjection: true });
             }

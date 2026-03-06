@@ -6,6 +6,13 @@ import { join } from 'path';
 import { WealthModule } from './wealth/wealth.module';
 import { WealthSnapshot } from './wealth/wealth-snapshot.entity';
 import { WealthSource } from './wealth/wealth-source.entity';
+import { BudgetModule } from './budget/budget.module';
+import { IncomeSource } from './budget/entities/income-source.entity';
+import { OutgoingSource } from './budget/entities/outgoing-source.entity';
+import { Account } from './budget/entities/account.entity';
+import { Allocation } from './budget/entities/allocation.entity';
+import { IncomeTransfer } from './budget/entities/income-transfer.entity';
+import { BackupModule } from './backup/backup.module';
 
 @Module({
   imports: [
@@ -29,8 +36,19 @@ import { WealthSource } from './wealth/wealth-source.entity';
             port: configService.get<number>('DB_PORT', 5432),
             username: configService.get<string>('DB_USERNAME', 'postgres'),
             password: configService.get<string>('DB_PASSWORD', 'postgres'),
-            database: configService.get<string>('DB_DATABASE', 'wealth_tracker'),
-            entities: [WealthSnapshot, WealthSource],
+            database: configService.get<string>(
+              'DB_DATABASE',
+              'wealth_tracker',
+            ),
+            entities: [
+              WealthSnapshot,
+              WealthSource,
+              IncomeSource,
+              OutgoingSource,
+              Account,
+              Allocation,
+              IncomeTransfer,
+            ],
             synchronize: true, // Safe for personal project
           };
         }
@@ -38,12 +56,22 @@ import { WealthSource } from './wealth/wealth-source.entity';
         return {
           type: 'sqlite',
           database: 'wealth.sqlite',
-          entities: [WealthSnapshot, WealthSource],
+          entities: [
+            WealthSnapshot,
+            WealthSource,
+            IncomeSource,
+            OutgoingSource,
+            Account,
+            Allocation,
+            IncomeTransfer,
+          ],
           synchronize: true,
         };
       },
     }),
     WealthModule,
+    BudgetModule,
+    BackupModule,
   ],
 })
 export class AppModule { }

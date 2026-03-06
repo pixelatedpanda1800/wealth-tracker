@@ -58,7 +58,7 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({ data, sources 
                                 key={t}
                                 onClick={() => setTimeline(t)}
                                 className={clsx(
-                                    "px-3 py-1.5 text-sm font-medium rounded-md transition-all",
+                                    "px-3 py-1.5 text-sm font-medium rounded-md transition-all focus:outline-none",
                                     timeline === t
                                         ? "bg-white text-indigo-600 shadow-sm"
                                         : "text-slate-500 hover:text-slate-700"
@@ -84,9 +84,10 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({ data, sources 
             </div>
 
             {/* Chart */}
-            <div className="h-[350px] w-full">
+            <div className="h-[350px] w-full outline-none focus:outline-none !shadow-none !border-0 [&_*]:outline-none">
                 <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
+                        className="focus:outline-none outline-none"
                         data={projectionData}
                         margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
                     >

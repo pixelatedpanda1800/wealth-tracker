@@ -17,6 +17,8 @@ COPY backend/package*.json ./
 RUN npm ci
 COPY backend/ .
 RUN npm run build
+# Prune dev dependencies to reduce image size
+RUN npm prune --production
 
 # Stage 3: Production Run
 FROM node:20-alpine

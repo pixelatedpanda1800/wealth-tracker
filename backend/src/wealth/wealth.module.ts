@@ -6,8 +6,8 @@ import { WealthService } from './wealth.service';
 import { WealthController } from './wealth.controller';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([WealthSnapshot, WealthSource])],
-    controllers: [WealthController],
-    providers: [WealthService],
+  imports: [TypeOrmModule.forFeature([WealthSnapshot, WealthSource])],
+  controllers: [WealthController],
+  providers: [WealthService],
 })
-export class WealthModule { }
+export class WealthModule {}

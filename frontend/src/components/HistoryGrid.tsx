@@ -9,7 +9,7 @@ interface HistoryGridProps {
 }
 
 export const HistoryGrid: React.FC<HistoryGridProps> = ({ data, sources }) => {
-    // Data is already processed by Dashboard
+    // Data is already processed by AssetTracker
     const history = data;
 
     // Sort sources by category: cash, investment, pension

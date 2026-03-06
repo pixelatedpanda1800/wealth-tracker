@@ -1,55 +1,65 @@
-import { Controller, Get, Post, Body, UsePipes, ValidationPipe, Param, Delete, Patch } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  UsePipes,
+  ValidationPipe,
+  Param,
+  Delete,
+  Patch,
+} from '@nestjs/common';
 import { WealthService } from './wealth.service';
 import { CreateWealthSnapshotDto } from './dto/create-wealth-snapshot.dto';
 
 @Controller('wealth')
 export class WealthController {
-    constructor(private readonly wealthService: WealthService) { }
+  constructor(private readonly wealthService: WealthService) {}
 
-    @Get()
-    findAll() {
-        return this.wealthService.findAllSnapshots();
-    }
+  @Get()
+  findAll() {
+    return this.wealthService.findAllSnapshots();
+  }
 
-    @Post()
-    @UsePipes(new ValidationPipe({ transform: true }))
-    create(@Body() createWealthSnapshotDto: CreateWealthSnapshotDto) {
-        return this.wealthService.createOrUpdateSnapshot(createWealthSnapshotDto);
-    }
+  @Post()
+  @UsePipes(new ValidationPipe({ transform: true }))
+  create(@Body() createWealthSnapshotDto: CreateWealthSnapshotDto) {
+    return this.wealthService.createOrUpdateSnapshot(createWealthSnapshotDto);
+  }
 
-    @Delete(':id')
-    remove(@Param('id') id: string) {
-        return this.wealthService.removeSnapshot(id);
-    }
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.wealthService.removeSnapshot(id);
+  }
 
-    @Get('sources')
-    findAllSources() {
-        return this.wealthService.findAllSources();
-    }
+  @Get('sources')
+  findAllSources() {
+    return this.wealthService.findAllSources();
+  }
 
-    @Post('sources')
-    createSource(@Body() data: any) {
-        return this.wealthService.createSource(data);
-    }
+  @Post('sources')
+  createSource(@Body() data: any) {
+    return this.wealthService.createSource(data);
+  }
 
-    @Patch('sources/:id')
-    updateSource(@Param('id') id: string, @Body() data: any) {
-        return this.wealthService.updateSource(id, data);
-    }
+  @Patch('sources/:id')
+  updateSource(@Param('id') id: string, @Body() data: any) {
+    return this.wealthService.updateSource(id, data);
+  }
 
-    @Delete('sources/:id')
-    removeSource(@Param('id') id: string) {
-        return this.wealthService.removeSource(id);
-    }
+  @Delete('sources/:id')
+  removeSource(@Param('id') id: string) {
+    return this.wealthService.removeSource(id);
+  }
 
-    @Get('export')
-    async exportCsv() {
-        const csv = await this.wealthService.exportToCsv();
-        return { csv };
-    }
+  @Get('export')
+  async exportCsv() {
+    const csv = await this.wealthService.exportToCsv();
+    return { csv };
+  }
 
-    @Post('import')
-    async importCsv(@Body() body: { csv: string }) {
-        return this.wealthService.importFromCsv(body.csv);
-    }
+  @Post('import')
+  async importCsv(@Body() body: { csv: string }) {
+    return this.wealthService.importFromCsv(body.csv);
+  }
 }
