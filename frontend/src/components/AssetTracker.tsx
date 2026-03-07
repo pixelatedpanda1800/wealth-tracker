@@ -53,10 +53,24 @@ export const AssetTracker: React.FC = () => {
     };
 
     // Get the latest entry with actual data (not estimated and not all zeros)
-    const latest = data.length > 0
-        ? (data.slice().reverse().find(d => !d.isEstimate && (d.total ?? 0) > 0)
-            || data[data.length - 1])
-        : { cash: 0, investment: 0, pension: 0, total: 0 };
+    const latestIndex = data.length > 0
+        ? data.slice().reverse().findIndex(d => !d.isEstimate && (d.total ?? 0) > 0)
+        : -1;
+
+    const latest = latestIndex !== -1
+        ? data[data.length - 1 - latestIndex]
+        : { cash: 0, investment: 0, pension: 0, total: 0 } as WealthEntry;
+
+    const previous = (latestIndex !== -1 && (data.length - 2 - latestIndex) >= 0)
+        ? data[data.length - 2 - latestIndex]
+        : null;
+
+    const calculateTrend = (current: number, prev: number | null | undefined) => {
+        if (prev === null || prev === undefined || prev === 0) return "0.0%";
+        const change = ((current - prev) / prev) * 100;
+        const sign = change >= 0 ? '+' : '';
+        return `${sign}${change.toFixed(1)}%`;
+    };
 
     return (
         <div className="space-y-8">
@@ -95,28 +109,28 @@ export const AssetTracker: React.FC = () => {
                 <StatCard
                     title="Total Wealth"
                     value={`£${(latest.total || 0).toLocaleString()}`}
-                    trend="+4.8%"
+                    trend={calculateTrend(latest.total || 0, previous?.total)}
                     icon={<Gem className="text-indigo-600" />}
                     color="indigo"
                 />
                 <StatCard
                     title="Cash"
                     value={`£${(latest.cash || 0).toLocaleString()}`}
-                    trend="+10.2%"
+                    trend={calculateTrend(latest.cash || 0, previous?.cash)}
                     icon={<Wallet className="text-emerald-600" />}
                     color="emerald"
                 />
                 <StatCard
                     title="Investments"
                     value={`£${(latest.investment || 0).toLocaleString()}`}
-                    trend="+3.5%"
+                    trend={calculateTrend(latest.investment || 0, previous?.investment)}
                     icon={<TrendingUp className="text-amber-600" />}
                     color="amber"
                 />
                 <StatCard
                     title="Pension"
                     value={`£${(latest.pension || 0).toLocaleString()}`}
-                    trend="+4.4%"
+                    trend={calculateTrend(latest.pension || 0, previous?.pension)}
                     icon={<Landmark className="text-purple-600" />}
                     color="purple"
                 />

@@ -27,9 +27,9 @@ import { BackupModule } from './backup/backup.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        // Check if Postgres config is available
-        const dbHost = configService.get<string>('DB_HOST');
-        if (dbHost) {
+        // Check if Postgres config is available (default to localhost for single-container Docker)
+        const dbHost = configService.get<string>('DB_HOST', 'localhost');
+        if (dbHost && dbHost !== 'sqlite') {
           return {
             type: 'postgres',
             host: dbHost,

@@ -3,7 +3,7 @@
 This guide explains how to deploy the `wealth-tracker` on a personal server using **Docker Compose**.
 
 > [!NOTE]
-> This configuration merges Frontend and Backend into a single **App** container. The Database runs in a separate **DB** container.
+> This configuration embeds the Frontend, Backend, and Database into a **single Docker image**.
 
 ## Prerequisites
 
@@ -15,7 +15,9 @@ This guide explains how to deploy the `wealth-tracker` on a personal server usin
 1. **Transfer Files**: Copy the project directory `wealth-tracker` to your server.
 
 2. **Database Persistence**:
-   - Edit `docker-compose.yml` to set the volume path for Postgres:
+   - The Database (Postgres) runs inside the single container securely.
+   - All data is persisted to a Docker volume across rebuilds and updates.
+   - Edit `docker-compose.yml` to set the volume path if you prefer a host binding for backup simplicity:
      ```yaml
      volumes:
        - /mnt/user/appdata/wealth-tracker/pgdata:/var/lib/postgresql/data
@@ -41,7 +43,11 @@ This guide explains how to deploy the `wealth-tracker` on a personal server usin
    - Frontend is served at `/`.
    - API is available at `/api`.
 
+4. **Updating**:
+   - To update, pull the new code and run `docker compose up -d --build` again. Your database data persists safely on the volume.
+
 ## Troubleshooting
 
-- **Postgres Connection**: The app waits for the DB to be healthy. If it fails, check `docker logs wealth_tracker_app`.
-- **Permissions**: Ensure the Postgres data directory is writable by the container user (usually UID 999).
+- **Check Logs**: If you have issues, use `docker logs wealth_tracker`.
+- **First Run**: The first run will automatically initialize the Postgres database. Depending on hardware performance, the app might take an extra couple of seconds to connect.
+- **Permissions**: Ensure the volume directory can be written to. The container ensures `/var/lib/postgresql/data` internal directory has `postgres:postgres` ownership.

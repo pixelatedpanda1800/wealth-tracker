@@ -1,44 +1,16 @@
 version: '3.8'
 
 services:
-  # Database Service
-  db:
-    image: postgres:15
-    container_name: wealth_tracker_db
-    restart: always
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: wealth_tracker
-    volumes:
-      # To persist data on host, change the left side to a local path
-      # e.g., - ./pgdata:/var/lib/postgresql/data
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  # Unified App Service (Frontend + Backend)
-  app:
-    container_name: wealth_tracker_app
+  wealth-tracker:
+    container_name: wealth_tracker
     build:
       context: .
       dockerfile: Dockerfile
     restart: always
-    environment:
-      # Connect to the 'db' service
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_USERNAME: postgres
-      DB_PASSWORD: postgres
-      DB_DATABASE: wealth_tracker
     ports:
-      - '3000:3000' # Expose App on port 3000
-    depends_on:
-      db:
-        condition: service_healthy
+      - '3000:3000'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
 volumes:
   postgres_data:
