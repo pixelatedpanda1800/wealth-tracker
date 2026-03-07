@@ -2,44 +2,50 @@
 set -e
 
 PGDATA="/var/lib/postgresql/data"
+export PGPASSWORD=postgres
+
+echo "[ENTRYPOINT] Starting wealth-tracker entrypoint script..."
 
 # Init DB if not created
 if [ ! -s "$PGDATA/PG_VERSION" ]; then
-    echo "Initializing Postgres database..."
+    echo "[ENTRYPOINT] Initializing Postgres database in $PGDATA..."
     
     # Ensure correct ownership
     chown -R postgres:postgres "$PGDATA"
     
-    # Init DB
-    echo "postgres" > /tmp/pgpass
-    chown postgres:postgres /tmp/pgpass
-    su - postgres -c "/usr/lib/postgresql/15/bin/initdb -D $PGDATA --pwfile=/tmp/pgpass"
-    rm /tmp/pgpass
+    # Init DB with trust for local setup
+    su - postgres -c "/usr/lib/postgresql/15/bin/initdb -D $PGDATA --auth-local=trust --auth-host=trust"
     
-    # Start Postgres temporarily to set up database
+    # Start Postgres temporarily
+    echo "[ENTRYPOINT] Starting temporary Postgres instance..."
     su - postgres -c "/usr/lib/postgresql/15/bin/pg_ctl -D $PGDATA -o '-c listen_addresses=localhost' -w start"
     
-    # Wait for Postgres to be ready
-    until su - postgres -c "/usr/lib/postgresql/15/bin/pg_isready -h localhost"; do
-      echo "Waiting for Postgres to be ready..."
-      sleep 1
-    done
-
-    echo "Creating database..."
-    su - postgres -c "psql -h localhost -c \"CREATE DATABASE wealth_tracker;\""
+    echo "[ENTRYPOINT] Configuring database..."
+    # Create the database and set the password
+    su - postgres -c "psql -h localhost -U postgres -d postgres <<EOF
+ALTER USER postgres WITH PASSWORD 'postgres';
+CREATE DATABASE wealth_tracker;
+EOF"
     
-    # Stop temporary Postgres instance
+    echo "[ENTRYPOINT] Verifying database creation..."
+    su - postgres -c "psql -h localhost -U postgres -lqt | cut -d \| -f 1 | grep -qw wealth_tracker" && echo "[ENTRYPOINT] Database verified." || (echo "[ENTRYPOINT] Database creation failed!" && exit 1)
+
+    echo "[ENTRYPOINT] Stopping temporary Postgres instance..."
     su - postgres -c "/usr/lib/postgresql/15/bin/pg_ctl -D $PGDATA -m fast -w stop"
     
-    # Allow local and docker network connections
-    echo "host all all 0.0.0.0/0 md5" >> "$PGDATA/pg_hba.conf"
+    echo "[ENTRYPOINT] Securing Postgres configuration..."
+    # Apply final security settings
+    echo "host all all 0.0.0.0/0 md5" > "$PGDATA/pg_hba.conf"
     echo "host all all 127.0.0.1/32 md5" >> "$PGDATA/pg_hba.conf"
+    echo "local all all trust" >> "$PGDATA/pg_hba.conf"
     echo "listen_addresses='*'" >> "$PGDATA/postgresql.auto.conf"
+    echo "[ENTRYPOINT] Database initialization complete."
 else
-    echo "Postgres data directory is already initialized."
-    # Ensure ownership is correct in case volume was mounted from somewhere else
+    echo "[ENTRYPOINT] Postgres data directory is already initialized."
+    # Ensure ownership is correct
     /bin/chown -R postgres:postgres "$PGDATA"
 fi
 
-echo "Starting supervisord..."
+echo "[ENTRYPOINT] Starting supervisord..."
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
+
