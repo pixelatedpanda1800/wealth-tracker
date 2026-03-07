@@ -1,0 +1,53 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>wealth-tracker</Name>
+  <Repository>ghcr.io/pixelatedpanda1800/wealth-tracker:latest</Repository>
+  <Registry>ghcr.io</Registry>
+  <Branch>
+    <Tag>latest</Tag>
+    <TagDescription>Latest stable release</TagDescription>
+  </Branch>
+  <Network>bridge</Network>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Support><!-- Unraid forum thread URL --></Support>
+  <Project>https://github.com/pixelatedpanda1800/wealth-tracker</Project>
+  <Overview>
+    Personal wealth and budget tracker. Track assets, liabilities, income,
+    and expenses with beautiful charts and projections. Self-hosted with
+    an embedded PostgreSQL database.
+  </Overview>
+  <Category>Productivity: Tools:</Category>
+  <WebUI>http://[IP]:[PORT:3000]</WebUI>
+  <Icon>https://raw.githubusercontent.com/pixelatedpanda1800/wealth-tracker/main/assets/wealth-tracker-icon.png</Icon>
+  <ExtraParams/>
+  <DateInstalled/>
+  <Description>
+    Personal wealth and budget tracker with embedded PostgreSQL.
+    Track assets, liabilities, income, and expenses.
+  </Description>
+
+  <!-- Port mapping -->
+  <Config
+    Name="WebUI Port"
+    Target="3000"
+    Default="3000"
+    Mode="tcp"
+    Description="Web interface port"
+    Type="Port"
+    Display="always"
+    Required="true"
+    Mask="false">3000</Config>
+
+  <!-- Volume for Postgres data persistence -->
+  <Config
+    Name="Postgres Data"
+    Target="/var/lib/postgresql/data"
+    Default="/mnt/user/appdata/wealth-tracker/pgdata"
+    Mode="rw"
+    Description="PostgreSQL database storage (persists across updates)"
+    Type="Path"
+    Display="always"
+    Required="true"
+    Mask="false">/mnt/user/appdata/wealth-tracker/pgdata</Config>
+</Container>
