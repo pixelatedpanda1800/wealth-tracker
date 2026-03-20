@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Loader2, Trash2, CreditCard, Landmark } from 'lucide-react';
-import { getAccounts, createAccount, deleteAccount, type Account } from '../../api';
+import { getAccounts, createAccount, deleteAccount, type Account, type AccountCategory } from '../../api';
 
 interface ManageAccountsModalProps {
     isOpen: boolean;
@@ -16,7 +16,8 @@ export const ManageAccountsModal: React.FC<ManageAccountsModalProps> = ({ isOpen
 
     // Form
     const [name, setName] = useState('');
-    const [type, setType] = useState<'bank' | 'savings'>('bank');
+    const [category, setCategory] = useState<AccountCategory>('spending');
+    const [allocatedAmount, setAllocatedAmount] = useState<number | ''>('');
 
     useEffect(() => {
         if (isOpen) {
@@ -40,7 +41,8 @@ export const ManageAccountsModal: React.FC<ManageAccountsModalProps> = ({ isOpen
 
     const resetForm = () => {
         setName('');
-        setType('bank');
+        setCategory('spending');
+        setAllocatedAmount('');
         setConfirmingDeleteId(null);
     };
 
@@ -50,7 +52,7 @@ export const ManageAccountsModal: React.FC<ManageAccountsModalProps> = ({ isOpen
 
         try {
             setIsSubmitting(true);
-            await createAccount({ name, type });
+            await createAccount({ name, category, allocatedAmount: Number(allocatedAmount) || 0 });
             await fetchAccounts();
             onAccountsChanged();
             resetForm();
@@ -102,13 +104,27 @@ export const ManageAccountsModal: React.FC<ManageAccountsModalProps> = ({ isOpen
                                 className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                             />
                             <select
-                                value={type}
-                                onChange={(e) => setType(e.target.value as 'bank' | 'savings')}
-                                className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                                value={category}
+                                onChange={(e) => setCategory(e.target.value as AccountCategory)}
+                                className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-1/3"
                             >
-                                <option value="bank">Bank</option>
+                                <option value="non-negotiable">Non-Negotiable</option>
+                                <option value="required">Required</option>
+                                <option value="optional">Optional</option>
                                 <option value="savings">Savings</option>
+                                <option value="spending">Spending</option>
                             </select>
+                        </div>
+                        <div>
+                            <input
+                                type="number"
+                                placeholder="Allocated Amount (£)"
+                                value={allocatedAmount}
+                                onChange={(e) => setAllocatedAmount(e.target.value ? Number(e.target.value) : '')}
+                                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                                min={0}
+                                step="0.01"
+                            />
                         </div>
                         <button
                             type="submit"
@@ -133,11 +149,11 @@ export const ManageAccountsModal: React.FC<ManageAccountsModalProps> = ({ isOpen
                                     <div key={account.id} className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-lg group">
                                         <div className="flex items-center gap-3">
                                             <div className="p-2 bg-slate-50 rounded-lg text-slate-500">
-                                                {account.type === 'bank' ? <CreditCard size={18} /> : <Landmark size={18} />}
+                                                {account.category === 'savings' ? <Landmark size={18} /> : <CreditCard size={18} />}
                                             </div>
                                             <div>
                                                 <p className="font-medium text-slate-900">{account.name}</p>
-                                                <p className="text-xs text-slate-500 capitalize">{account.type} Account</p>
+                                                <p className="text-xs text-slate-500 capitalize">{account.category.replace('-', ' ')} · £{Number(account.allocatedAmount).toLocaleString()}</p>
                                             </div>
                                         </div>
                                         <button

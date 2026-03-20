@@ -25,10 +25,6 @@ class BudgetDataDto {
     @IsArray()
     @IsOptional()
     allocations: any[];
-
-    @IsArray()
-    @IsOptional()
-    incomeTransfers: any[];
 }
 
 class DataDto {

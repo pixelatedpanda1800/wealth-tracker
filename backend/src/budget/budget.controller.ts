@@ -12,7 +12,6 @@ import { CreateIncomeDto, UpdateIncomeDto } from './dto/income.dto';
 import { CreateOutgoingDto, UpdateOutgoingDto } from './dto/outgoing.dto';
 import { CreateAccountDto, UpdateAccountDto } from './dto/account.dto';
 import { CreateAllocationDto, UpdateAllocationDto } from './dto/allocation.dto';
-import { CreateIncomeTransferDto, UpdateIncomeTransferDto } from './dto/income-transfer.dto';
 
 @Controller('budget')
 export class BudgetController {
@@ -97,30 +96,5 @@ export class BudgetController {
     return this.budgetService.updateAllocation(id, dto);
   }
 
-  @Delete('allocations/:id')
-  deleteAllocation(@Param('id') id: string) {
-    return this.budgetService.deleteAllocation(id);
-  }
-
-  // === INCOME TRANSFERS ===
-  @Get('income-transfers')
-  findAllIncomeTransfers() {
-    return this.budgetService.findAllIncomeTransfers();
-  }
-
-  @Post('income-transfers')
-  createIncomeTransfer(@Body() dto: CreateIncomeTransferDto) {
-    return this.budgetService.createIncomeTransfer(dto);
-  }
-
-  @Put('income-transfers/:id')
-  updateIncomeTransfer(@Param('id') id: string, @Body() dto: UpdateIncomeTransferDto) {
-    return this.budgetService.updateIncomeTransfer(id, dto);
-  }
-
-  @Delete('income-transfers/:id')
-  deleteIncomeTransfer(@Param('id') id: string) {
-    return this.budgetService.deleteIncomeTransfer(id);
-  }
 }
 

@@ -9,8 +9,6 @@ import { CreateIncomeDto, UpdateIncomeDto } from './dto/income.dto';
 import { CreateOutgoingDto, UpdateOutgoingDto } from './dto/outgoing.dto';
 import { CreateAccountDto, UpdateAccountDto } from './dto/account.dto';
 import { CreateAllocationDto, UpdateAllocationDto } from './dto/allocation.dto';
-import { CreateIncomeTransferDto, UpdateIncomeTransferDto } from './dto/income-transfer.dto';
-import { IncomeTransfer } from './entities/income-transfer.entity';
 
 @Injectable()
 export class BudgetService {
@@ -23,8 +21,6 @@ export class BudgetService {
     private readonly accountRepository: Repository<Account>,
     @InjectRepository(Allocation)
     private readonly allocationRepository: Repository<Allocation>,
-    @InjectRepository(IncomeTransfer)
-    private readonly incomeTransferRepository: Repository<IncomeTransfer>,
   ) { }
 
   // === INCOMES ===
@@ -102,27 +98,5 @@ export class BudgetService {
     return this.allocationRepository.findOneOrFail({ where: { id }, relations: ['account'] });
   }
 
-  async deleteAllocation(id: string): Promise<void> {
-    await this.allocationRepository.delete(id);
-  }
-
-  // === INCOME TRANSFERS ===
-  async findAllIncomeTransfers(): Promise<IncomeTransfer[]> {
-    return this.incomeTransferRepository.find({ relations: ['sourceAccount', 'targetAccount'] });
-  }
-
-  async createIncomeTransfer(dto: CreateIncomeTransferDto): Promise<IncomeTransfer> {
-    const transfer = this.incomeTransferRepository.create(dto);
-    return this.incomeTransferRepository.save(transfer);
-  }
-
-  async updateIncomeTransfer(id: string, dto: UpdateIncomeTransferDto): Promise<IncomeTransfer> {
-    await this.incomeTransferRepository.update(id, dto);
-    return this.incomeTransferRepository.findOneOrFail({ where: { id }, relations: ['sourceAccount', 'targetAccount'] });
-  }
-
-  async deleteIncomeTransfer(id: string): Promise<void> {
-    await this.incomeTransferRepository.delete(id);
-  }
 }
 

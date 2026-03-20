@@ -11,7 +11,6 @@ import { IncomeSource } from './budget/entities/income-source.entity';
 import { OutgoingSource } from './budget/entities/outgoing-source.entity';
 import { Account } from './budget/entities/account.entity';
 import { Allocation } from './budget/entities/allocation.entity';
-import { IncomeTransfer } from './budget/entities/income-transfer.entity';
 import { BackupModule } from './backup/backup.module';
 
 @Module({
@@ -47,7 +46,6 @@ import { BackupModule } from './backup/backup.module';
               OutgoingSource,
               Account,
               Allocation,
-              IncomeTransfer,
             ],
             synchronize: true, // Safe for personal project
           };
@@ -63,7 +61,6 @@ import { BackupModule } from './backup/backup.module';
             OutgoingSource,
             Account,
             Allocation,
-            IncomeTransfer,
           ],
           synchronize: true,
         };

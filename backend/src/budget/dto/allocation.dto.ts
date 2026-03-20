@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsIn, IsUUID, IsOptional } from 'class-validator';
+import { IsString, IsNumber, IsUUID, IsOptional } from 'class-validator';
 
 export class CreateAllocationDto {
     @IsString()
@@ -6,9 +6,6 @@ export class CreateAllocationDto {
 
     @IsNumber()
     amount: number;
-
-    @IsIn(['bills', 'spending', 'savings'])
-    category: 'bills' | 'spending' | 'savings';
 
     @IsUUID()
     accountId: string;
@@ -22,10 +19,6 @@ export class UpdateAllocationDto {
     @IsOptional()
     @IsNumber()
     amount?: number;
-
-    @IsOptional()
-    @IsIn(['bills', 'spending', 'savings'])
-    category?: 'bills' | 'spending' | 'savings';
 
     @IsOptional()
     @IsUUID()

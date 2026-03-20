@@ -150,7 +150,7 @@ export const ProjectionChart: React.FC<ProjectionChartProps> = ({ data, sources 
                             />
                         )}
                         <Area
-                            type="monotone"
+                            type="linear"
                             dataKey="value"
                             stroke="#6366F1"
                             fill="url(#projectionGradient)"

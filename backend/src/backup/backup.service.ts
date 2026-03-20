@@ -7,7 +7,6 @@ import { IncomeSource } from '../budget/entities/income-source.entity';
 import { OutgoingSource } from '../budget/entities/outgoing-source.entity';
 import { Account } from '../budget/entities/account.entity';
 import { Allocation } from '../budget/entities/allocation.entity';
-import { IncomeTransfer } from '../budget/entities/income-transfer.entity';
 import { BackupDataDto } from './dto/backup-data.dto';
 
 @Injectable()
@@ -25,8 +24,6 @@ export class BackupService {
         private accountRepo: Repository<Account>,
         @InjectRepository(Allocation)
         private allocationRepo: Repository<Allocation>,
-        @InjectRepository(IncomeTransfer)
-        private incomeTransferRepo: Repository<IncomeTransfer>,
     ) { }
 
     async exportFullBackup(): Promise<BackupDataDto> {
@@ -36,8 +33,7 @@ export class BackupService {
             incomes,
             outgoings,
             accounts,
-            allocations,
-            incomeTransfers
+            allocations
         ] = await Promise.all([
             this.wealthSourceRepo.find(),
             this.wealthSnapshotRepo.find(),
@@ -45,7 +41,6 @@ export class BackupService {
             this.outgoingRepo.find(),
             this.accountRepo.find(),
             this.allocationRepo.find(),
-            this.incomeTransferRepo.find(),
         ]);
 
         return {
@@ -61,7 +56,6 @@ export class BackupService {
                     outgoings: outgoings,
                     accounts: accounts,
                     allocations: allocations,
-                    incomeTransfers: incomeTransfers,
                 },
             },
         };
@@ -116,13 +110,6 @@ export class BackupService {
             }
         }
 
-        // Process Income Transfers
-        if (budget?.incomeTransfers) {
-            for (const transfer of budget.incomeTransfers) {
-                await this.incomeTransferRepo.save(transfer);
-            }
-        }
-
         return {
             success: true,
             message: 'Restore completed successfully',
@@ -133,7 +120,6 @@ export class BackupService {
                 outgoings: budget?.outgoings?.length || 0,
                 accounts: budget?.accounts?.length || 0,
                 allocations: budget?.allocations?.length || 0,
-                incomeTransfers: budget?.incomeTransfers?.length || 0,
             },
         };
     }

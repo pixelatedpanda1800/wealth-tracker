@@ -4,12 +4,16 @@ export class CreateAccountDto {
     @IsString()
     name: string;
 
-    @IsIn(['bank', 'savings'])
-    type: 'bank' | 'savings';
+    @IsIn(['non-negotiable', 'required', 'optional', 'savings', 'spending'])
+    category: 'non-negotiable' | 'required' | 'optional' | 'savings' | 'spending';
 
     @IsOptional()
     @IsString()
     color?: string;
+
+    @IsOptional()
+    @IsNumber()
+    allocatedAmount?: number;
 }
 
 export class UpdateAccountDto {
@@ -18,10 +22,14 @@ export class UpdateAccountDto {
     name?: string;
 
     @IsOptional()
-    @IsIn(['bank', 'savings'])
-    type?: 'bank' | 'savings';
+    @IsIn(['non-negotiable', 'required', 'optional', 'savings', 'spending'])
+    category?: 'non-negotiable' | 'required' | 'optional' | 'savings' | 'spending';
 
     @IsOptional()
     @IsString()
     color?: string;
+
+    @IsOptional()
+    @IsNumber()
+    allocatedAmount?: number;
 }

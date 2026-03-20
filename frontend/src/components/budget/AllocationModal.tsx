@@ -2,19 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { X, Plus, Loader2, Check } from 'lucide-react';
 import {
     createAllocation, updateAllocation, getAccounts,
-    type Allocation, type Account, type AllocationCategory
+    type Allocation, type Account
 } from '../../api';
 
 interface AllocationModalProps {
     isOpen: boolean;
     onClose: () => void;
     onAllocationsChanged: () => void;
-    initialCategory?: AllocationCategory;
+    initialAccountId?: string;
     editingAllocation?: Allocation | null;
 }
 
 export const AllocationModal: React.FC<AllocationModalProps> = ({
-    isOpen, onClose, onAllocationsChanged, initialCategory, editingAllocation
+    isOpen, onClose, onAllocationsChanged, initialAccountId, editingAllocation
 }) => {
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [loading, setLoading] = useState(false);
@@ -23,7 +23,6 @@ export const AllocationModal: React.FC<AllocationModalProps> = ({
     // Form
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState<number | ''>('');
-    const [category, setCategory] = useState<AllocationCategory>('bills');
     const [accountId, setAccountId] = useState('');
 
     useEffect(() => {
@@ -32,14 +31,13 @@ export const AllocationModal: React.FC<AllocationModalProps> = ({
             if (editingAllocation) {
                 setDescription(editingAllocation.description);
                 setAmount(editingAllocation.amount);
-                setCategory(editingAllocation.category);
                 setAccountId(editingAllocation.accountId);
             } else {
                 resetForm();
-                if (initialCategory) setCategory(initialCategory);
+                if (initialAccountId) setAccountId(initialAccountId);
             }
         }
-    }, [isOpen, editingAllocation, initialCategory]);
+    }, [isOpen, editingAllocation, initialAccountId]);
 
     const fetchAccounts = async () => {
         try {
@@ -47,7 +45,7 @@ export const AllocationModal: React.FC<AllocationModalProps> = ({
             const data = await getAccounts();
             setAccounts(data);
             // Default select first account if adding new and no account selected
-            if (!editingAllocation && !accountId && data.length > 0) {
+            if (!editingAllocation && !accountId && data.length > 0 && !initialAccountId) {
                 setAccountId(data[0].id);
             }
         } catch (error) {
@@ -60,8 +58,7 @@ export const AllocationModal: React.FC<AllocationModalProps> = ({
     const resetForm = () => {
         setDescription('');
         setAmount('');
-        setCategory(initialCategory || 'bills');
-        setAccountId('');
+        setAccountId(initialAccountId || '');
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -73,7 +70,6 @@ export const AllocationModal: React.FC<AllocationModalProps> = ({
             const payload = {
                 description,
                 amount: Number(amount),
-                category,
                 accountId
             };
 
@@ -120,7 +116,7 @@ export const AllocationModal: React.FC<AllocationModalProps> = ({
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Amount</label>
                                 <div className="relative">
@@ -136,18 +132,6 @@ export const AllocationModal: React.FC<AllocationModalProps> = ({
                                     />
                                 </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
-                                <select
-                                    value={category}
-                                    onChange={(e) => setCategory(e.target.value as AllocationCategory)}
-                                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                                >
-                                    <option value="bills">Bills</option>
-                                    <option value="spending">Spending</option>
-                                    <option value="savings">Savings</option>
-                                </select>
-                            </div>
                         </div>
 
                         <div>
@@ -160,7 +144,7 @@ export const AllocationModal: React.FC<AllocationModalProps> = ({
                             >
                                 <option value="" disabled>Select Account</option>
                                 {accounts.map(acc => (
-                                    <option key={acc.id} value={acc.id}>{acc.name} ({acc.type})</option>
+                                    <option key={acc.id} value={acc.id}>{acc.name}</option>
                                 ))}
                             </select>
                             {accounts.length === 0 && !loading && (

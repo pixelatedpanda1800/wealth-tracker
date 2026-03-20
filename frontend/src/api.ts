@@ -139,11 +139,14 @@ export const deleteOutgoing = async (id: string): Promise<void> => {
     await api.delete(`/budget/outgoings/${id}`);
 };
 // Accounts
+export type AccountCategory = 'non-negotiable' | 'required' | 'optional' | 'savings' | 'spending';
+
 export interface Account {
     id: string;
     name: string;
-    type: 'bank' | 'savings';
+    category: AccountCategory;
     color?: string;
+    allocatedAmount: number;
 }
 
 export const getAccounts = async (): Promise<Account[]> => {
@@ -165,14 +168,10 @@ export const deleteAccount = async (id: string): Promise<void> => {
     await api.delete(`/budget/accounts/${id}`);
 };
 
-// Allocations
-export type AllocationCategory = 'bills' | 'spending' | 'savings';
-
 export interface Allocation {
     id: string;
     description: string;
     amount: number;
-    category: AllocationCategory;
     accountId: string;
     account?: Account;
 }
@@ -196,33 +195,4 @@ export const deleteAllocation = async (id: string): Promise<void> => {
     await api.delete(`/budget/allocations/${id}`);
 };
 
-// Income Transfers
-export interface IncomeTransfer {
-    id: string;
-    description: string;
-    amount: number;
-    category: AllocationCategory;
-    sourceAccountId: string;
-    targetAccountId: string;
-    sourceAccount?: Account;
-    targetAccount?: Account;
-}
 
-export const getIncomeTransfers = async (): Promise<IncomeTransfer[]> => {
-    const response = await api.get<IncomeTransfer[]>('/budget/income-transfers');
-    return response.data;
-};
-
-export const createIncomeTransfer = async (data: Omit<IncomeTransfer, 'id' | 'sourceAccount' | 'targetAccount'>): Promise<IncomeTransfer> => {
-    const response = await api.post<IncomeTransfer>('/budget/income-transfers', data);
-    return response.data;
-};
-
-export const updateIncomeTransfer = async (id: string, data: Partial<Omit<IncomeTransfer, 'id' | 'sourceAccount' | 'targetAccount'>>): Promise<IncomeTransfer> => {
-    const response = await api.put<IncomeTransfer>(`/budget/income-transfers/${id}`, data);
-    return response.data;
-};
-
-export const deleteIncomeTransfer = async (id: string): Promise<void> => {
-    await api.delete(`/budget/income-transfers/${id}`);
-};

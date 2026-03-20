@@ -27,8 +27,9 @@ export const WealthChart: React.FC<WealthChartProps> = ({ data, sources, viewMod
 
     const chartData = data.map(d => {
         const flattenedValues: any = { ...d };
-        Object.entries(d.values || {}).forEach(([id, val]) => {
-            flattenedValues[`source_${id}`] = val;
+        // Ensure every source has a value (default to 0) to prevent gaps in stacked area
+        sources.forEach(source => {
+            flattenedValues[`source_${source.id}`] = d.values?.[source.id] ?? 0;
         });
         return {
             ...flattenedValues,
@@ -170,7 +171,7 @@ export const WealthChart: React.FC<WealthChartProps> = ({ data, sources, viewMod
                             return (
                                 <Area
                                     key={source.id}
-                                    type="monotone"
+                                    type="linear"
                                     dataKey={`source_${source.id}`}
                                     stackId="1"
                                     stroke={color}
