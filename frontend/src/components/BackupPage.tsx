@@ -1,14 +1,45 @@
-import React, { useState, useRef } from 'react';
-import { Download, Upload, AlertTriangle, CheckCircle, Database, FileJson, Loader2 } from 'lucide-react';
-import { exportFullBackup, importFullBackup, type BackupData } from '../api';
+import React, { useState, useRef, useEffect } from 'react';
+import { Download, Upload, AlertTriangle, CheckCircle, Database, FileJson, Loader2, Undo2 } from 'lucide-react';
+import { exportFullBackup, importFullBackup, canRevertBackup, revertBackup, type BackupData } from '../api';
 import { clsx } from 'clsx';
 
 export const BackupPage: React.FC = () => {
     const [isExporting, setIsExporting] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
+    const [isReverting, setIsReverting] = useState(false);
+    const [canRevert, setCanRevert] = useState(false);
     const [importData, setImportData] = useState<BackupData | null>(null);
     const [importStatus, setImportStatus] = useState<{ success: boolean; message: string } | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        checkRevertStatus();
+    }, []);
+
+    const checkRevertStatus = async () => {
+        try {
+            const hasRevert = await canRevertBackup();
+            setCanRevert(hasRevert);
+        } catch (error) {
+            console.error('Failed to check revert status', error);
+        }
+    };
+
+    const handleRevert = async () => {
+        if (!confirm('Are you sure you want to revert to the previous data? The current data will be completely deleted.')) return;
+        try {
+            setIsReverting(true);
+            const result = await revertBackup();
+            setImportStatus(result);
+            checkRevertStatus();
+        } catch (error: any) {
+            console.error('Revert failed', error);
+            const message = error.response?.data?.message || error.message || 'Failed to revert backup.';
+            alert(`Failed to revert backup: ${message}`);
+        } finally {
+            setIsReverting(false);
+        }
+    };
 
     const handleExport = async () => {
         try {
@@ -64,6 +95,7 @@ export const BackupPage: React.FC = () => {
             const result = await importFullBackup(importData);
             setImportStatus(result);
             setImportData(null);
+            checkRevertStatus();
         } catch (error: any) {
             console.error('Import failed', error);
             const message = error.response?.data?.message || error.message || 'Failed to import backup.';
@@ -113,7 +145,7 @@ export const BackupPage: React.FC = () => {
                         <p className="text-slate-500 mt-2 text-sm leading-relaxed">
                             Restore your data from a previous backup file.
                             <br />
-                            <span className="text-amber-600 font-medium">Warning:</span> This will merge data and may overwrite existing entries.
+                            <span className="text-amber-600 font-medium">Warning:</span> This will completely overwrite existing data.
                         </p>
                     </div>
 
@@ -150,6 +182,24 @@ export const BackupPage: React.FC = () => {
                     </p>
                 </div>
             </div>
+
+            {/* REVERT SECTION */}
+            {canRevert && (
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-indigo-100 flex items-center justify-between">
+                    <div>
+                        <h2 className="text-lg font-bold text-slate-900">Undo Last Restore</h2>
+                        <p className="text-slate-500 text-sm">You have a saved version of your data before the last restore. You can revert back to it.</p>
+                    </div>
+                    <button
+                        onClick={handleRevert}
+                        disabled={isReverting}
+                        className="px-5 py-2.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg font-medium transition-colors shadow-sm flex items-center gap-2"
+                    >
+                        {isReverting ? <Loader2 className="animate-spin" size={18} /> : <Undo2 size={18} />}
+                        Revert Data
+                    </button>
+                </div>
+            )}
 
             {/* IMPORT CONFIRMATION */}
             {importData && (

@@ -51,15 +51,4 @@ export class WealthController {
   removeSource(@Param('id') id: string) {
     return this.wealthService.removeSource(id);
   }
-
-  @Get('export')
-  async exportCsv() {
-    const csv = await this.wealthService.exportToCsv();
-    return { csv };
-  }
-
-  @Post('import')
-  async importCsv(@Body() body: { csv: string }) {
-    return this.wealthService.importFromCsv(body.csv);
-  }
 }

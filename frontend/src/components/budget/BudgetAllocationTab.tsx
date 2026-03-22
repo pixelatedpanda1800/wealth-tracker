@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Wallet, PiggyBank, Briefcase, Plus, Pencil, Trash2, AlertTriangle, Check, Landmark, ShoppingBag, ShieldBan } from 'lucide-react';
+import { Settings, Wallet, PiggyBank, Briefcase, Plus, Pencil, Trash2, AlertTriangle, Check, Landmark, ShoppingBag, ShieldBan, Loader2, AlertCircle } from 'lucide-react';
 import { clsx } from 'clsx';
 import {
     getAllocations, deleteAllocation, getAccounts,
@@ -15,6 +15,8 @@ interface BudgetAllocationTabProps {
 export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ totalIncome }) => {
     const [allocations, setAllocations] = useState<Allocation[]>([]);
     const [accounts, setAccounts] = useState<Account[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     // Modals
     const [isManageAccountsOpen, setIsManageAccountsOpen] = useState(false);
@@ -29,14 +31,19 @@ export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ totalI
 
     const fetchData = async () => {
         try {
+            setLoading(true);
+            setError(null);
             const [allocData, accData] = await Promise.all([
                 getAllocations(),
                 getAccounts()
             ]);
             setAllocations(allocData);
             setAccounts(accData);
-        } catch (error) {
-            console.error('Failed to fetch budget allocation data', error);
+        } catch (err) {
+            console.error('Failed to fetch budget allocation data', err);
+            setError('Failed to load allocation data. Please ensure the backend is running.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -78,6 +85,13 @@ export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ totalI
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {error && (
+                <div className="bg-rose-50 border border-rose-200 p-4 rounded-xl flex items-center gap-3 text-rose-700 transition-all">
+                    <AlertCircle size={24} className="flex-shrink-0" />
+                    <p className="font-medium">{error}</p>
+                </div>
+            )}
+
             {/* Header Validation & Actions */}
             <div className="flex justify-between items-start">
                 <div className={clsx(
@@ -115,8 +129,13 @@ export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ totalI
                 </div>
             </div>
 
-            <div className="space-y-6">
-                <AccountCategorySection
+            {loading ? (
+                <div className="flex justify-center items-center py-16">
+                    <Loader2 className="animate-spin text-indigo-600" size={32} />
+                </div>
+            ) : (
+                <div className="space-y-6">
+                    <AccountCategorySection
                     title="Non-Negotiable Accounts"
                     accounts={groupedAccounts['non-negotiable']}
                     allocations={allocations}
@@ -170,7 +189,8 @@ export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ totalI
                     onEditPot={openEditAllocationModal}
                     onDeletePot={handleDeleteAllocation}
                 />
-            </div>
+                </div>
+            )}
 
             {/* Modals */}
             <ManageAccountsModal
