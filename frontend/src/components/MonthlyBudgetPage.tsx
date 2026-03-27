@@ -129,7 +129,7 @@ export const MonthlyBudgetPage: React.FC = () => {
                         activeTab === 'allocation' ? "text-indigo-600" : "text-slate-500 hover:text-slate-700"
                     )}
                 >
-                    Budget Allocation
+                    Spending Allocation
                     {activeTab === 'allocation' && (
                         <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600 rounded-t-full" />
                     )}
@@ -212,7 +212,7 @@ export const MonthlyBudgetPage: React.FC = () => {
                     </div>
                 </div>
             ) : (
-                <BudgetAllocationTab totalIncome={totalIncome} />
+                <BudgetAllocationTab remainingToSpend={netResult} />
             )}
 
             <BudgetSourcesModal

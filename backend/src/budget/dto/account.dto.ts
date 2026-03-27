@@ -4,8 +4,8 @@ export class CreateAccountDto {
     @IsString()
     name: string;
 
-    @IsIn(['non-negotiable', 'required', 'optional', 'savings', 'spending'])
-    category: 'non-negotiable' | 'required' | 'optional' | 'savings' | 'spending';
+    @IsIn(['investment', 'spending', 'saving', 'outgoings'])
+    category: 'investment' | 'spending' | 'saving' | 'outgoings';
 
     @IsOptional()
     @IsString()
@@ -22,8 +22,8 @@ export class UpdateAccountDto {
     name?: string;
 
     @IsOptional()
-    @IsIn(['non-negotiable', 'required', 'optional', 'savings', 'spending'])
-    category?: 'non-negotiable' | 'required' | 'optional' | 'savings' | 'spending';
+    @IsIn(['investment', 'spending', 'saving', 'outgoings'])
+    category?: 'investment' | 'spending' | 'saving' | 'outgoings';
 
     @IsOptional()
     @IsString()

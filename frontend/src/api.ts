@@ -134,7 +134,7 @@ export const deleteOutgoing = async (id: string): Promise<void> => {
     await api.delete(`/budget/outgoings/${id}`);
 };
 // Accounts
-export type AccountCategory = 'non-negotiable' | 'required' | 'optional' | 'savings' | 'spending';
+export type AccountCategory = 'investment' | 'spending' | 'saving' | 'outgoings';
 
 export interface Account {
     id: string;

@@ -11,10 +11,17 @@ export const BackupPage: React.FC = () => {
     const [importData, setImportData] = useState<BackupData | null>(null);
     const [importStatus, setImportStatus] = useState<{ success: boolean; message: string } | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const confirmationRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         checkRevertStatus();
     }, []);
+
+    useEffect(() => {
+        if (importData && confirmationRef.current) {
+            confirmationRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, [importData]);
 
     const checkRevertStatus = async () => {
         try {
@@ -203,7 +210,7 @@ export const BackupPage: React.FC = () => {
 
             {/* IMPORT CONFIRMATION */}
             {importData && (
-                <div className="bg-white border-l-4 border-amber-500 p-6 rounded-xl shadow-sm animate-in fade-in slide-in-from-bottom-2">
+                <div ref={confirmationRef} className="bg-white border-l-4 border-amber-500 p-6 rounded-xl shadow-sm animate-in fade-in slide-in-from-bottom-2">
                     <div className="flex items-start gap-4">
                         <div className="p-2 bg-amber-100 rounded-lg text-amber-600">
                             <AlertTriangle size={24} />

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Loader2, Trash2, CreditCard, Landmark } from 'lucide-react';
-import { getAccounts, createAccount, deleteAccount, type Account, type AccountCategory } from '../../api';
+import { getAccounts, createAccount, deleteAccount, type Account } from '../../api';
 
 interface ManageAccountsModalProps {
     isOpen: boolean;
@@ -14,10 +14,7 @@ export const ManageAccountsModal: React.FC<ManageAccountsModalProps> = ({ isOpen
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
-    // Form
     const [name, setName] = useState('');
-    const [category, setCategory] = useState<AccountCategory>('spending');
-    const [allocatedAmount, setAllocatedAmount] = useState<number | ''>('');
 
     useEffect(() => {
         if (isOpen) {
@@ -41,8 +38,6 @@ export const ManageAccountsModal: React.FC<ManageAccountsModalProps> = ({ isOpen
 
     const resetForm = () => {
         setName('');
-        setCategory('spending');
-        setAllocatedAmount('');
         setConfirmingDeleteId(null);
     };
 
@@ -52,7 +47,7 @@ export const ManageAccountsModal: React.FC<ManageAccountsModalProps> = ({ isOpen
 
         try {
             setIsSubmitting(true);
-            await createAccount({ name, category, allocatedAmount: Number(allocatedAmount) || 0 });
+            await createAccount({ name, category: 'spending', allocatedAmount: 0 });
             await fetchAccounts();
             onAccountsChanged();
             resetForm();
@@ -95,35 +90,13 @@ export const ManageAccountsModal: React.FC<ManageAccountsModalProps> = ({ isOpen
                     {/* Add Account Form */}
                     <form onSubmit={handleSubmit} className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
                         <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Add New Account</h3>
-                        <div className="flex gap-3">
+                        <div className="flex flex-col gap-3">
                             <input
                                 type="text"
                                 placeholder="Account Name (e.g. Starling)"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
-                                className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                            />
-                            <select
-                                value={category}
-                                onChange={(e) => setCategory(e.target.value as AccountCategory)}
-                                className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-1/3"
-                            >
-                                <option value="non-negotiable">Non-Negotiable</option>
-                                <option value="required">Required</option>
-                                <option value="optional">Optional</option>
-                                <option value="savings">Savings</option>
-                                <option value="spending">Spending</option>
-                            </select>
-                        </div>
-                        <div>
-                            <input
-                                type="number"
-                                placeholder="Allocated Amount (£)"
-                                value={allocatedAmount}
-                                onChange={(e) => setAllocatedAmount(e.target.value ? Number(e.target.value) : '')}
                                 className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                                min={0}
-                                step="0.01"
                             />
                         </div>
                         <button
@@ -149,11 +122,11 @@ export const ManageAccountsModal: React.FC<ManageAccountsModalProps> = ({ isOpen
                                     <div key={account.id} className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-lg group">
                                         <div className="flex items-center gap-3">
                                             <div className="p-2 bg-slate-50 rounded-lg text-slate-500">
-                                                {account.category === 'savings' ? <Landmark size={18} /> : <CreditCard size={18} />}
+                                                {account.category === 'investment' || account.category === 'saving' ? <Landmark size={18} /> : <CreditCard size={18} />}
                                             </div>
                                             <div>
                                                 <p className="font-medium text-slate-900">{account.name}</p>
-                                                <p className="text-xs text-slate-500 capitalize">{account.category.replace('-', ' ')} · £{Number(account.allocatedAmount).toLocaleString()}</p>
+                                                <p className="text-xs text-slate-500 capitalize">{account.category.replace('-', ' ')}</p>
                                             </div>
                                         </div>
                                         <button

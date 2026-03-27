@@ -69,12 +69,12 @@ export class BackupService {
 
     private async clearAllData(): Promise<void> {
         // Reverse order of dependencies
-        await this.allocationRepo.delete({});
-        await this.accountRepo.delete({});
-        await this.outgoingRepo.delete({});
-        await this.incomeRepo.delete({});
-        await this.wealthSnapshotRepo.delete({});
-        await this.wealthSourceRepo.delete({});
+        await this.allocationRepo.createQueryBuilder().delete().execute();
+        await this.accountRepo.createQueryBuilder().delete().execute();
+        await this.outgoingRepo.createQueryBuilder().delete().execute();
+        await this.incomeRepo.createQueryBuilder().delete().execute();
+        await this.wealthSnapshotRepo.createQueryBuilder().delete().execute();
+        await this.wealthSourceRepo.createQueryBuilder().delete().execute();
     }
 
     private async insertBackupData(backup: BackupDataDto): Promise<void> {

@@ -331,16 +331,53 @@ export const calculateProjections = (
         changes.push(curr - prev);
     }
 
-    // Use Median to filter out outliers (like one-off deposits)
-    changes.sort((a, b) => a - b);
+    // Calculate projected growth using a mathematically robust method:
+    // Median Absolute Deviation (MAD) Outlier Rejection.
+    // This allows us to find the "typical" average by gracefully filtering out
+    // dramatic one-off deposits (like a house purchase) or one-off drops (market crash)
+    // without manual thresholds.
+
     let avgMonthlyGrowth = 0;
 
     if (changes.length > 0) {
-        const mid = Math.floor(changes.length / 2);
-        if (changes.length % 2 !== 0) {
-            avgMonthlyGrowth = changes[mid];
+        if (changes.length < 4) {
+             // Not enough data points to do meaningful outlier detection 
+             // just fallback to an absolute simple average.
+             const totalChange = changes.reduce((sum, val) => sum + val, 0);
+             avgMonthlyGrowth = totalChange / changes.length;
         } else {
-            avgMonthlyGrowth = (changes[mid - 1] + changes[mid]) / 2;
+             // 1. Calculate the Median
+             const sortedChanges = [...changes].sort((a, b) => a - b);
+             const getMedian = (arr: number[]) => {
+                 const mid = Math.floor(arr.length / 2);
+                 return arr.length % 2 !== 0 ? arr[mid] : (arr[mid - 1] + arr[mid]) / 2;
+             };
+             const medianChange = getMedian(sortedChanges);
+
+             // 2. Calculate the Median Absolute Deviation (MAD)
+             const deviations = changes.map(val => Math.abs(val - medianChange));
+             deviations.sort((a, b) => a - b);
+             const mad = getMedian(deviations);
+
+             // 3. Define the bound configuration. 
+             // We use 2 * MAD which is a strict threshold suitable for highly volatile data 
+             // to exclude everything but the core baseline changes. 
+             // If mad is 0 (lots of identical values), ensure threshold is slightly > 0
+             const threshold = mad === 0 ? 1 : mad * 2;
+             
+             // 4. Filter the changes to keep ONLY the organic, non-outlier changes
+             const validChanges = changes.filter(val => {
+                 return Math.abs(val - medianChange) <= threshold;
+             });
+
+             // 5. Average the remaining valid changes to deduce realistic periodic trajectory
+             if (validChanges.length > 0) {
+                 const totalValid = validChanges.reduce((sum, val) => sum + val, 0);
+                 avgMonthlyGrowth = totalValid / validChanges.length;
+             } else {
+                 // Fallback if filtering removed absolutely everything
+                 avgMonthlyGrowth = medianChange;
+             }
         }
     }
 

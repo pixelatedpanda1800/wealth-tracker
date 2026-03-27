@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Wallet, PiggyBank, Briefcase, Plus, Pencil, Trash2, AlertTriangle, Check, Landmark, ShoppingBag, ShieldBan, Loader2, AlertCircle } from 'lucide-react';
+import { Settings, Wallet, PiggyBank, Briefcase, Plus, Pencil, Trash2, AlertTriangle, Check, Landmark, ShoppingBag, Loader2, AlertCircle } from 'lucide-react';
 import { clsx } from 'clsx';
 import {
     getAllocations, deleteAllocation, getAccounts,
@@ -9,10 +9,10 @@ import { ManageAccountsModal } from './ManageAccountsModal';
 import { AllocationModal } from './AllocationModal';
 
 interface BudgetAllocationTabProps {
-    totalIncome: number;
+    remainingToSpend: number;
 }
 
-export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ totalIncome }) => {
+export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ remainingToSpend }) => {
     const [allocations, setAllocations] = useState<Allocation[]>([]);
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [loading, setLoading] = useState(true);
@@ -70,17 +70,16 @@ export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ totalI
     };
 
     // Calculations
-    const totalAllocated = accounts.reduce((sum, acc) => sum + Number(acc.allocatedAmount), 0);
-    const remainingToAllocate = totalIncome - totalAllocated;
+    const totalAllocated = allocations.reduce((sum, a) => sum + Number(a.amount), 0);
+    const remainingToAllocate = remainingToSpend - totalAllocated;
     const isOverAllocated = remainingToAllocate < 0;
 
     // Grouping
     const groupedAccounts = {
-        'non-negotiable': accounts.filter(a => a.category === 'non-negotiable'),
-        'required': accounts.filter(a => a.category === 'required'),
-        'optional': accounts.filter(a => a.category === 'optional'),
-        'savings': accounts.filter(a => a.category === 'savings'),
+        'investment': accounts.filter(a => a.category === 'investment'),
         'spending': accounts.filter(a => a.category === 'spending'),
+        'saving': accounts.filter(a => a.category === 'saving'),
+        'outgoings': accounts.filter(a => a.category === 'outgoings'),
     };
 
     return (
@@ -89,6 +88,12 @@ export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ totalI
                 <div className="bg-rose-50 border border-rose-200 p-4 rounded-xl flex items-center gap-3 text-rose-700 transition-all">
                     <AlertCircle size={24} className="flex-shrink-0" />
                     <p className="font-medium">{error}</p>
+                </div>
+            )}
+            {isOverAllocated && (
+                <div className="bg-rose-50 border border-rose-200 p-4 rounded-xl flex items-center gap-3 text-rose-700 transition-all shadow-sm">
+                    <AlertTriangle size={24} className="flex-shrink-0" />
+                    <p className="font-medium">Warning: Amount allocated to spending exceeds available remaining budget!</p>
                 </div>
             )}
 
@@ -103,7 +108,7 @@ export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ totalI
                     {isOverAllocated ? <AlertTriangle size={24} /> : <Check size={24} />}
                     <div>
                         <p className="text-xs font-semibold uppercase tracking-wider opacity-80">
-                            {isOverAllocated ? 'Over Allocated' : 'Remaining to Allocate'}
+                            {isOverAllocated ? 'Over Allocated' : 'Remaining to Allocate (Spending)'}
                         </p>
                         <p className="text-xl font-bold">
                             {isOverAllocated ? '-' : ''}£{Math.abs(remainingToAllocate).toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -135,45 +140,12 @@ export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ totalI
                 </div>
             ) : (
                 <div className="space-y-6">
-                    <AccountCategorySection
-                    title="Non-Negotiable Accounts"
-                    accounts={groupedAccounts['non-negotiable']}
-                    allocations={allocations}
-                    color="rose"
-                    icon={<ShieldBan className="text-rose-600" size={20} />}
-                    onAddPot={openAddAllocationModal}
-                    onEditPot={openEditAllocationModal}
-                    onDeletePot={handleDeleteAllocation}
-                />
-
                 <AccountCategorySection
-                    title="Required Accounts"
-                    accounts={groupedAccounts['required']}
-                    allocations={allocations}
-                    color="amber"
-                    icon={<Briefcase className="text-amber-600" size={20} />}
-                    onAddPot={openAddAllocationModal}
-                    onEditPot={openEditAllocationModal}
-                    onDeletePot={handleDeleteAllocation}
-                />
-
-                <AccountCategorySection
-                    title="Optional Accounts"
-                    accounts={groupedAccounts['optional']}
-                    allocations={allocations}
-                    color="blue"
-                    icon={<ShoppingBag className="text-blue-600" size={20} />}
-                    onAddPot={openAddAllocationModal}
-                    onEditPot={openEditAllocationModal}
-                    onDeletePot={handleDeleteAllocation}
-                />
-
-                <AccountCategorySection
-                    title="Savings Accounts"
-                    accounts={groupedAccounts['savings']}
+                    title="Investment Accounts"
+                    accounts={groupedAccounts['investment']}
                     allocations={allocations}
                     color="emerald"
-                    icon={<PiggyBank className="text-emerald-600" size={20} />}
+                    icon={<Briefcase className="text-emerald-600" size={20} />}
                     onAddPot={openAddAllocationModal}
                     onEditPot={openEditAllocationModal}
                     onDeletePot={handleDeleteAllocation}
@@ -185,6 +157,28 @@ export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ totalI
                     allocations={allocations}
                     color="indigo"
                     icon={<Wallet className="text-indigo-600" size={20} />}
+                    onAddPot={openAddAllocationModal}
+                    onEditPot={openEditAllocationModal}
+                    onDeletePot={handleDeleteAllocation}
+                />
+
+                <AccountCategorySection
+                    title="Saving Accounts"
+                    accounts={groupedAccounts['saving']}
+                    allocations={allocations}
+                    color="blue"
+                    icon={<PiggyBank className="text-blue-600" size={20} />}
+                    onAddPot={openAddAllocationModal}
+                    onEditPot={openEditAllocationModal}
+                    onDeletePot={handleDeleteAllocation}
+                />
+
+                <AccountCategorySection
+                    title="Outgoings Accounts"
+                    accounts={groupedAccounts['outgoings']}
+                    allocations={allocations}
+                    color="rose"
+                    icon={<ShoppingBag className="text-rose-600" size={20} />}
                     onAddPot={openAddAllocationModal}
                     onEditPot={openEditAllocationModal}
                     onDeletePot={handleDeleteAllocation}
@@ -236,7 +230,7 @@ const AccountCategorySection: React.FC<AccountCategorySectionProps> = ({
         indigo: { header: 'bg-indigo-50 border-indigo-100', text: 'text-indigo-700' },
     }[color];
 
-    const totalAllocated = accounts.reduce((sum, acc) => sum + Number(acc.allocatedAmount), 0);
+    const totalAllocated = allocations.filter(pot => accounts.some(acc => acc.id === pot.accountId)).reduce((sum, p) => sum + Number(p.amount), 0);
 
     return (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -261,8 +255,6 @@ const AccountCategorySection: React.FC<AccountCategorySectionProps> = ({
             <div className="divide-y divide-slate-100 bg-slate-50/30">
                 {accounts.map(account => {
                     const accountPots = allocations.filter(a => a.accountId === account.id);
-                    const totalPots = accountPots.reduce((sum, p) => sum + Number(p.amount), 0);
-                    const unallocated = Number(account.allocatedAmount) - totalPots;
 
                     return (
                         <div key={account.id} className="p-5">
@@ -272,9 +264,7 @@ const AccountCategorySection: React.FC<AccountCategorySectionProps> = ({
                                         <Landmark size={18} className="text-slate-400" />
                                         {account.name}
                                     </h4>
-                                    <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-full border border-slate-200">
-                                        Income allocated: £{Number(account.allocatedAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                    </span>
+
                                 </div>
                                 <button
                                     onClick={() => onAddPot(account.id)}
@@ -284,18 +274,8 @@ const AccountCategorySection: React.FC<AccountCategorySectionProps> = ({
                                 </button>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                {/* Unallocated / Main Balance Card */}
-                                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
-                                    <div className="absolute top-0 left-0 w-1 h-full bg-slate-300"></div>
-                                    <p className="text-sm font-medium text-slate-500 mb-1">Main Balance / Unallocated</p>
-                                    <p className={clsx("text-lg font-bold", unallocated < 0 ? "text-rose-600" : "text-slate-900")}>
-                                        £{unallocated.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                    </p>
-                                    {unallocated < 0 && (
-                                        <p className="text-[10px] text-rose-500 font-semibold absolute bottom-2 right-3">Pots exceed allocation!</p>
-                                    )}
-                                </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+
 
                                 {/* Pots */}
                                 {accountPots.map(pot => (
