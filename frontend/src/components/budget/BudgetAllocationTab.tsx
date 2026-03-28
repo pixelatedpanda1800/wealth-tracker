@@ -48,7 +48,6 @@ export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ remain
     };
 
     const handleDeleteAllocation = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this pot?')) return;
         try {
             await deleteAllocation(id);
             await fetchData();
@@ -123,13 +122,6 @@ export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ remain
                     >
                         <Settings size={18} />
                         Manage Accounts
-                    </button>
-                    <button
-                        onClick={() => openAddAllocationModal('')}
-                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors shadow-sm"
-                    >
-                        <Plus size={18} />
-                        Add Pot
                     </button>
                 </div>
             </div>

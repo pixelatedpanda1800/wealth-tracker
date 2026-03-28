@@ -47,7 +47,7 @@ import { BackupModule } from './backup/backup.module';
               Account,
               Allocation,
             ],
-            synchronize: false, // Use migrations for production
+            synchronize: true,
           };
         }
         // Fallback to SQLite for local dev if no env vars

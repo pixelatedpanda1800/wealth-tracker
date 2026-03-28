@@ -98,5 +98,9 @@ export class BudgetService {
     return this.allocationRepository.findOneOrFail({ where: { id }, relations: ['account'] });
   }
 
+  async deleteAllocation(id: string): Promise<void> {
+    await this.allocationRepository.delete(id);
+  }
+
 }
 

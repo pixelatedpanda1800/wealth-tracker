@@ -1,5 +1,6 @@
 # Stage 1: Build Frontend
-FROM node:20-alpine AS builder-frontend
+FROM node:22-alpine AS builder-frontend
+RUN apk add --no-cache git
 WORKDIR /app/frontend
 # Copy dependency definitions
 COPY frontend/package*.json ./
@@ -11,7 +12,8 @@ COPY frontend/ .
 RUN npm run build
 
 # Stage 2: Build Backend
-FROM node:20-alpine AS builder-backend
+FROM node:22-alpine AS builder-backend
+RUN apk add --no-cache git
 WORKDIR /app/backend
 COPY backend/package*.json ./
 RUN npm ci
@@ -21,7 +23,7 @@ RUN npm run build
 RUN npm prune --production
 
 # Stage 3: Production Run
-FROM node:20-bookworm-slim
+FROM node:22-bookworm-slim
 WORKDIR /app
 
 # Install PostgreSQL 15 and Supervisor

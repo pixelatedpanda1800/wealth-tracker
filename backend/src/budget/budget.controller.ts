@@ -96,5 +96,10 @@ export class BudgetController {
     return this.budgetService.updateAllocation(id, dto);
   }
 
+  @Delete('allocations/:id')
+  deleteAllocation(@Param('id') id: string) {
+    return this.budgetService.deleteAllocation(id);
+  }
+
 }
 
