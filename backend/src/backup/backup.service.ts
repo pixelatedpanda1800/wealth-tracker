@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { WealthSnapshot } from '../wealth/wealth-snapshot.entity';
 import { WealthSource } from '../wealth/wealth-source.entity';
 import { IncomeSource } from '../budget/entities/income-source.entity';
@@ -26,6 +26,7 @@ export class BackupService {
         private accountRepo: Repository<Account>,
         @InjectRepository(Allocation)
         private allocationRepo: Repository<Allocation>,
+        private dataSource: DataSource,
     ) { }
 
     async exportFullBackup(): Promise<BackupDataDto> {
@@ -67,43 +68,43 @@ export class BackupService {
         return path.join(process.cwd(), '.backup-revert.json');
     }
 
-    private async clearAllData(): Promise<void> {
+    private async clearAllData(manager: EntityManager): Promise<void> {
         // Reverse order of dependencies
-        await this.allocationRepo.createQueryBuilder().delete().execute();
-        await this.accountRepo.createQueryBuilder().delete().execute();
-        await this.outgoingRepo.createQueryBuilder().delete().execute();
-        await this.incomeRepo.createQueryBuilder().delete().execute();
-        await this.wealthSnapshotRepo.createQueryBuilder().delete().execute();
-        await this.wealthSourceRepo.createQueryBuilder().delete().execute();
+        await manager.createQueryBuilder().delete().from(Allocation).execute();
+        await manager.createQueryBuilder().delete().from(Account).execute();
+        await manager.createQueryBuilder().delete().from(OutgoingSource).execute();
+        await manager.createQueryBuilder().delete().from(IncomeSource).execute();
+        await manager.createQueryBuilder().delete().from(WealthSnapshot).execute();
+        await manager.createQueryBuilder().delete().from(WealthSource).execute();
     }
 
-    private async insertBackupData(backup: BackupDataDto): Promise<void> {
+    private async insertBackupData(backup: BackupDataDto, manager: EntityManager): Promise<void> {
         const { wealth, budget } = backup.data;
 
         for (const source of wealth.sources) {
-            await this.wealthSourceRepo.save(source);
+            await manager.save(WealthSource, source);
         }
         for (const snapshot of wealth.snapshots) {
-            await this.wealthSnapshotRepo.save(snapshot);
+            await manager.save(WealthSnapshot, snapshot);
         }
         if (budget?.incomes) {
             for (const income of budget.incomes) {
-                await this.incomeRepo.save(income);
+                await manager.save(IncomeSource, income);
             }
         }
         if (budget?.outgoings) {
             for (const outgoing of budget.outgoings) {
-                await this.outgoingRepo.save(outgoing);
+                await manager.save(OutgoingSource, outgoing);
             }
         }
         if (budget?.accounts) {
             for (const account of budget.accounts) {
-                await this.accountRepo.save(account);
+                await manager.save(Account, account);
             }
         }
         if (budget?.allocations) {
             for (const allocation of budget.allocations) {
-                await this.allocationRepo.save(allocation);
+                await manager.save(Allocation, allocation);
             }
         }
     }
@@ -114,18 +115,22 @@ export class BackupService {
         stats: any;
     }> {
         if (!backup.data || !backup.version) {
-            throw new Error('Invalid backup format');
+            throw new BadRequestException('Invalid backup format');
         }
 
-        // 1. Export current state and save it
+        // 1. Snapshot current state to disk before touching the DB
         const currentData = await this.exportFullBackup();
-        await fs.promises.writeFile(this.getRevertFilePath(), JSON.stringify(currentData), 'utf-8');
+        try {
+            await fs.promises.writeFile(this.getRevertFilePath(), JSON.stringify(currentData), 'utf-8');
+        } catch (err) {
+            throw new InternalServerErrorException(`Failed to write revert snapshot: ${(err as Error).message}`);
+        }
 
-        // 2. Clear Database
-        await this.clearAllData();
-
-        // 3. Insert new data
-        await this.insertBackupData(backup);
+        // 2. Clear and re-insert inside a transaction — rolls back automatically on any failure
+        await this.dataSource.transaction(async (manager) => {
+            await this.clearAllData(manager);
+            await this.insertBackupData(backup, manager);
+        });
 
         const { wealth, budget } = backup.data;
         return {
@@ -149,17 +154,28 @@ export class BackupService {
     async revertBackup(): Promise<{ success: boolean; message: string }> {
         const filePath = this.getRevertFilePath();
         if (!fs.existsSync(filePath)) {
-            throw new Error('No revert backup found');
+            throw new NotFoundException('No revert backup found');
         }
 
-        const rawData = await fs.promises.readFile(filePath, 'utf-8');
-        const backupData: BackupDataDto = JSON.parse(rawData);
+        let backupData: BackupDataDto;
+        try {
+            const rawData = await fs.promises.readFile(filePath, 'utf-8');
+            backupData = JSON.parse(rawData);
+        } catch (err) {
+            throw new InternalServerErrorException(`Failed to read revert snapshot: ${(err as Error).message}`);
+        }
 
-        await this.clearAllData();
-        await this.insertBackupData(backupData);
+        // Revert inside a transaction — rolls back if anything fails
+        await this.dataSource.transaction(async (manager) => {
+            await this.clearAllData(manager);
+            await this.insertBackupData(backupData, manager);
+        });
 
-        // Delete the revert file so you can only revert once
-        await fs.promises.unlink(filePath);
+        try {
+            await fs.promises.unlink(filePath);
+        } catch {
+            // Non-fatal: revert succeeded, cleanup of file failed
+        }
 
         return { success: true, message: 'Reverted successfully to previous data.' };
     }

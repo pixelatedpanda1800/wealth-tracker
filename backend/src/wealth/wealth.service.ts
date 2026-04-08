@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WealthSnapshot } from './wealth-snapshot.entity';
 import { WealthSource } from './wealth-source.entity';
 import { CreateWealthSnapshotDto } from './dto/create-wealth-snapshot.dto';
+import { CreateWealthSourceDto, UpdateWealthSourceDto } from './dto/wealth-source.dto';
 
 @Injectable()
 export class WealthService {
@@ -66,8 +67,8 @@ export class WealthService {
     return this.sourceRepository.find({ order: { createdAt: 'ASC' } });
   }
 
-  async createSource(data: Partial<WealthSource>): Promise<WealthSource> {
-    const source = this.sourceRepository.create(data);
+  async createSource(dto: CreateWealthSourceDto): Promise<WealthSource> {
+    const source = this.sourceRepository.create(dto);
     return this.sourceRepository.save(source);
   }
 
@@ -77,9 +78,13 @@ export class WealthService {
 
   async updateSource(
     id: string,
-    data: Partial<WealthSource>,
-  ): Promise<WealthSource | null> {
-    await this.sourceRepository.update(id, data);
-    return this.sourceRepository.findOneBy({ id });
+    dto: UpdateWealthSourceDto,
+  ): Promise<WealthSource> {
+    const existing = await this.sourceRepository.findOneBy({ id });
+    if (!existing) {
+      throw new NotFoundException(`Wealth source ${id} not found`);
+    }
+    await this.sourceRepository.update(id, dto);
+    return this.sourceRepository.findOneBy({ id }) as Promise<WealthSource>;
   }
 }

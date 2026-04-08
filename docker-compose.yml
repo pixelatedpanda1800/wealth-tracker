@@ -9,6 +9,8 @@ services:
     restart: always
     ports:
       - '3000:3000'
+    env_file:
+      - .env        # Copy .env.example → .env and set DB_PASSWORD before running
     volumes:
       - postgres_data:/var/lib/postgresql/data
 

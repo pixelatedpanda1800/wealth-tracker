@@ -60,10 +60,11 @@ VOLUME /var/lib/postgresql/data
 # Expose port (Backend serves both)
 EXPOSE 3000
 
+# Non-sensitive defaults — override via env_file or environment in docker-compose.yml
 ENV DB_HOST=localhost
 ENV DB_PORT=5432
 ENV DB_USERNAME=postgres
-ENV DB_PASSWORD=postgres
 ENV DB_DATABASE=wealth_tracker
+# DB_PASSWORD has no default — must be supplied at runtime via env_file or -e flag
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

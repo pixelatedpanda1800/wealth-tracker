@@ -2,7 +2,13 @@
 set -e
 
 PGDATA="/var/lib/postgresql/data"
-export PGPASSWORD=postgres
+
+if [ -z "${DB_PASSWORD}" ]; then
+    echo "[ENTRYPOINT] ERROR: DB_PASSWORD environment variable is not set. Aborting."
+    exit 1
+fi
+
+export PGPASSWORD="${DB_PASSWORD}"
 
 echo "[ENTRYPOINT] Starting wealth-tracker entrypoint script..."
 
@@ -23,12 +29,12 @@ if [ ! -s "$PGDATA/PG_VERSION" ]; then
     echo "[ENTRYPOINT] Configuring database..."
     # Create the database and set the password
     su - postgres -c "psql -h localhost -U postgres -d postgres <<EOF
-ALTER USER postgres WITH PASSWORD 'postgres';
-CREATE DATABASE wealth_tracker;
+ALTER USER postgres WITH PASSWORD '${DB_PASSWORD}';
+CREATE DATABASE ${DB_DATABASE:-wealth_tracker};
 EOF"
     
     echo "[ENTRYPOINT] Verifying database creation..."
-    su - postgres -c "psql -h localhost -U postgres -lqt | cut -d \| -f 1 | grep -qw wealth_tracker" && echo "[ENTRYPOINT] Database verified." || (echo "[ENTRYPOINT] Database creation failed!" && exit 1)
+    su - postgres -c "psql -h localhost -U postgres -lqt | cut -d \| -f 1 | grep -qw ${DB_DATABASE:-wealth_tracker}" && echo "[ENTRYPOINT] Database verified." || (echo "[ENTRYPOINT] Database creation failed!" && exit 1)
 
     echo "[ENTRYPOINT] Stopping temporary Postgres instance..."
     su - postgres -c "/usr/lib/postgresql/15/bin/pg_ctl -D $PGDATA -m fast -w stop"

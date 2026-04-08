@@ -1,22 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Settings, Wallet, PiggyBank, Briefcase, Plus, Pencil, Trash2, AlertTriangle, Check, Landmark, ShoppingBag, Loader2, AlertCircle } from 'lucide-react';
 import { clsx } from 'clsx';
 import {
-    getAllocations, deleteAllocation, getAccounts,
+    deleteAllocation,
     type Allocation, type Account
 } from '../../api';
 import { ManageAccountsModal } from './ManageAccountsModal';
 import { AllocationModal } from './AllocationModal';
+import { useAllocations, useAccounts, useQueryClient, QueryKeys } from '../../hooks/queries';
 
 interface BudgetAllocationTabProps {
     remainingToSpend: number;
 }
 
 export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ remainingToSpend }) => {
-    const [allocations, setAllocations] = useState<Allocation[]>([]);
-    const [accounts, setAccounts] = useState<Account[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const queryClient = useQueryClient();
+    const { data: allocations = [], isLoading: allocLoading, error: allocError } = useAllocations();
+    const { data: accounts = [], isLoading: accLoading, error: accError } = useAccounts();
+
+    const loading = allocLoading || accLoading;
+    const error = allocError || accError
+        ? 'Failed to load allocation data. Please ensure the backend is running.'
+        : null;
 
     // Modals
     const [isManageAccountsOpen, setIsManageAccountsOpen] = useState(false);
@@ -25,32 +30,15 @@ export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ remain
     const [editingAllocation, setEditingAllocation] = useState<Allocation | null>(null);
     const [modalAccountId, setModalAccountId] = useState<string>('');
 
-    useEffect(() => {
-        fetchData();
-    }, []);
-
-    const fetchData = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            const [allocData, accData] = await Promise.all([
-                getAllocations(),
-                getAccounts()
-            ]);
-            setAllocations(allocData);
-            setAccounts(accData);
-        } catch (err) {
-            console.error('Failed to fetch budget allocation data', err);
-            setError('Failed to load allocation data. Please ensure the backend is running.');
-        } finally {
-            setLoading(false);
-        }
+    const invalidate = () => {
+        queryClient.invalidateQueries({ queryKey: QueryKeys.allocations });
+        queryClient.invalidateQueries({ queryKey: QueryKeys.accounts });
     };
 
     const handleDeleteAllocation = async (id: string) => {
         try {
             await deleteAllocation(id);
-            await fetchData();
+            queryClient.invalidateQueries({ queryKey: QueryKeys.allocations });
         } catch (error) {
             console.error('Failed to delete allocation', error);
         }
@@ -182,13 +170,13 @@ export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ remain
             <ManageAccountsModal
                 isOpen={isManageAccountsOpen}
                 onClose={() => setIsManageAccountsOpen(false)}
-                onAccountsChanged={fetchData}
+                onAccountsChanged={invalidate}
             />
 
             <AllocationModal
                 isOpen={isAllocationModalOpen}
                 onClose={() => setIsAllocationModalOpen(false)}
-                onAllocationsChanged={fetchData}
+                onAllocationsChanged={invalidate}
                 initialAccountId={modalAccountId}
                 editingAllocation={editingAllocation}
             />
