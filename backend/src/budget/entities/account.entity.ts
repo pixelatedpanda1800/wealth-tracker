@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
 
-export type AccountCategory = 'non-negotiable' | 'required' | 'optional' | 'savings' | 'spending';
+export type AccountCategory = 'investment' | 'spending' | 'saving' | 'outgoings';
 
 @Entity('accounts')
 export class Account {

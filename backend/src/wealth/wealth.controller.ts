@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { WealthService } from './wealth.service';
 import { CreateWealthSnapshotDto } from './dto/create-wealth-snapshot.dto';
+import { CreateWealthSourceDto, UpdateWealthSourceDto } from './dto/wealth-source.dto';
 
 @Controller('wealth')
 export class WealthController {
@@ -38,28 +39,17 @@ export class WealthController {
   }
 
   @Post('sources')
-  createSource(@Body() data: any) {
-    return this.wealthService.createSource(data);
+  createSource(@Body() dto: CreateWealthSourceDto) {
+    return this.wealthService.createSource(dto);
   }
 
   @Patch('sources/:id')
-  updateSource(@Param('id') id: string, @Body() data: any) {
-    return this.wealthService.updateSource(id, data);
+  updateSource(@Param('id') id: string, @Body() dto: UpdateWealthSourceDto) {
+    return this.wealthService.updateSource(id, dto);
   }
 
   @Delete('sources/:id')
   removeSource(@Param('id') id: string) {
     return this.wealthService.removeSource(id);
-  }
-
-  @Get('export')
-  async exportCsv() {
-    const csv = await this.wealthService.exportToCsv();
-    return { csv };
-  }
-
-  @Post('import')
-  async importCsv(@Body() body: { csv: string }) {
-    return this.wealthService.importFromCsv(body.csv);
   }
 }

@@ -1,20 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import { Settings, Wallet, PiggyBank, Briefcase, Plus, Pencil, Trash2, AlertTriangle, Check, Landmark, ShoppingBag, ShieldBan } from 'lucide-react';
+import React, { useState } from 'react';
+import { Settings, Wallet, PiggyBank, Briefcase, Plus, Pencil, Trash2, AlertTriangle, Check, Landmark, ShoppingBag, Loader2, AlertCircle } from 'lucide-react';
 import { clsx } from 'clsx';
 import {
-    getAllocations, deleteAllocation, getAccounts,
+    deleteAllocation,
     type Allocation, type Account
 } from '../../api';
 import { ManageAccountsModal } from './ManageAccountsModal';
 import { AllocationModal } from './AllocationModal';
+import { useAllocations, useAccounts, useQueryClient, QueryKeys } from '../../hooks/queries';
 
 interface BudgetAllocationTabProps {
-    totalIncome: number;
+    remainingToSpend: number;
 }
 
-export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ totalIncome }) => {
-    const [allocations, setAllocations] = useState<Allocation[]>([]);
-    const [accounts, setAccounts] = useState<Account[]>([]);
+export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ remainingToSpend }) => {
+    const queryClient = useQueryClient();
+    const { data: allocations = [], isLoading: allocLoading, error: allocError } = useAllocations();
+    const { data: accounts = [], isLoading: accLoading, error: accError } = useAccounts();
+
+    const loading = allocLoading || accLoading;
+    const error = allocError || accError
+        ? 'Failed to load allocation data. Please ensure the backend is running.'
+        : null;
 
     // Modals
     const [isManageAccountsOpen, setIsManageAccountsOpen] = useState(false);
@@ -23,28 +30,15 @@ export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ totalI
     const [editingAllocation, setEditingAllocation] = useState<Allocation | null>(null);
     const [modalAccountId, setModalAccountId] = useState<string>('');
 
-    useEffect(() => {
-        fetchData();
-    }, []);
-
-    const fetchData = async () => {
-        try {
-            const [allocData, accData] = await Promise.all([
-                getAllocations(),
-                getAccounts()
-            ]);
-            setAllocations(allocData);
-            setAccounts(accData);
-        } catch (error) {
-            console.error('Failed to fetch budget allocation data', error);
-        }
+    const invalidate = () => {
+        queryClient.invalidateQueries({ queryKey: QueryKeys.allocations });
+        queryClient.invalidateQueries({ queryKey: QueryKeys.accounts });
     };
 
     const handleDeleteAllocation = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this pot?')) return;
         try {
             await deleteAllocation(id);
-            await fetchData();
+            queryClient.invalidateQueries({ queryKey: QueryKeys.allocations });
         } catch (error) {
             console.error('Failed to delete allocation', error);
         }
@@ -63,21 +57,33 @@ export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ totalI
     };
 
     // Calculations
-    const totalAllocated = accounts.reduce((sum, acc) => sum + Number(acc.allocatedAmount), 0);
-    const remainingToAllocate = totalIncome - totalAllocated;
+    const totalAllocated = allocations.reduce((sum, a) => sum + Number(a.amount), 0);
+    const remainingToAllocate = remainingToSpend - totalAllocated;
     const isOverAllocated = remainingToAllocate < 0;
 
     // Grouping
     const groupedAccounts = {
-        'non-negotiable': accounts.filter(a => a.category === 'non-negotiable'),
-        'required': accounts.filter(a => a.category === 'required'),
-        'optional': accounts.filter(a => a.category === 'optional'),
-        'savings': accounts.filter(a => a.category === 'savings'),
+        'investment': accounts.filter(a => a.category === 'investment'),
         'spending': accounts.filter(a => a.category === 'spending'),
+        'saving': accounts.filter(a => a.category === 'saving'),
+        'outgoings': accounts.filter(a => a.category === 'outgoings'),
     };
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {error && (
+                <div className="bg-rose-50 border border-rose-200 p-4 rounded-xl flex items-center gap-3 text-rose-700 transition-all">
+                    <AlertCircle size={24} className="flex-shrink-0" />
+                    <p className="font-medium">{error}</p>
+                </div>
+            )}
+            {isOverAllocated && (
+                <div className="bg-rose-50 border border-rose-200 p-4 rounded-xl flex items-center gap-3 text-rose-700 transition-all shadow-sm">
+                    <AlertTriangle size={24} className="flex-shrink-0" />
+                    <p className="font-medium">Warning: Amount allocated to spending exceeds available remaining budget!</p>
+                </div>
+            )}
+
             {/* Header Validation & Actions */}
             <div className="flex justify-between items-start">
                 <div className={clsx(
@@ -89,7 +95,7 @@ export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ totalI
                     {isOverAllocated ? <AlertTriangle size={24} /> : <Check size={24} />}
                     <div>
                         <p className="text-xs font-semibold uppercase tracking-wider opacity-80">
-                            {isOverAllocated ? 'Over Allocated' : 'Remaining to Allocate'}
+                            {isOverAllocated ? 'Over Allocated' : 'Remaining to Allocate (Spending)'}
                         </p>
                         <p className="text-xl font-bold">
                             {isOverAllocated ? '-' : ''}£{Math.abs(remainingToAllocate).toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -105,56 +111,21 @@ export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ totalI
                         <Settings size={18} />
                         Manage Accounts
                     </button>
-                    <button
-                        onClick={() => openAddAllocationModal('')}
-                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors shadow-sm"
-                    >
-                        <Plus size={18} />
-                        Add Pot
-                    </button>
                 </div>
             </div>
 
-            <div className="space-y-6">
+            {loading ? (
+                <div className="flex justify-center items-center py-16">
+                    <Loader2 className="animate-spin text-indigo-600" size={32} />
+                </div>
+            ) : (
+                <div className="space-y-6">
                 <AccountCategorySection
-                    title="Non-Negotiable Accounts"
-                    accounts={groupedAccounts['non-negotiable']}
-                    allocations={allocations}
-                    color="rose"
-                    icon={<ShieldBan className="text-rose-600" size={20} />}
-                    onAddPot={openAddAllocationModal}
-                    onEditPot={openEditAllocationModal}
-                    onDeletePot={handleDeleteAllocation}
-                />
-
-                <AccountCategorySection
-                    title="Required Accounts"
-                    accounts={groupedAccounts['required']}
-                    allocations={allocations}
-                    color="amber"
-                    icon={<Briefcase className="text-amber-600" size={20} />}
-                    onAddPot={openAddAllocationModal}
-                    onEditPot={openEditAllocationModal}
-                    onDeletePot={handleDeleteAllocation}
-                />
-
-                <AccountCategorySection
-                    title="Optional Accounts"
-                    accounts={groupedAccounts['optional']}
-                    allocations={allocations}
-                    color="blue"
-                    icon={<ShoppingBag className="text-blue-600" size={20} />}
-                    onAddPot={openAddAllocationModal}
-                    onEditPot={openEditAllocationModal}
-                    onDeletePot={handleDeleteAllocation}
-                />
-
-                <AccountCategorySection
-                    title="Savings Accounts"
-                    accounts={groupedAccounts['savings']}
+                    title="Investment Accounts"
+                    accounts={groupedAccounts['investment']}
                     allocations={allocations}
                     color="emerald"
-                    icon={<PiggyBank className="text-emerald-600" size={20} />}
+                    icon={<Briefcase className="text-emerald-600" size={20} />}
                     onAddPot={openAddAllocationModal}
                     onEditPot={openEditAllocationModal}
                     onDeletePot={handleDeleteAllocation}
@@ -170,19 +141,42 @@ export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ totalI
                     onEditPot={openEditAllocationModal}
                     onDeletePot={handleDeleteAllocation}
                 />
-            </div>
+
+                <AccountCategorySection
+                    title="Saving Accounts"
+                    accounts={groupedAccounts['saving']}
+                    allocations={allocations}
+                    color="blue"
+                    icon={<PiggyBank className="text-blue-600" size={20} />}
+                    onAddPot={openAddAllocationModal}
+                    onEditPot={openEditAllocationModal}
+                    onDeletePot={handleDeleteAllocation}
+                />
+
+                <AccountCategorySection
+                    title="Outgoings Accounts"
+                    accounts={groupedAccounts['outgoings']}
+                    allocations={allocations}
+                    color="rose"
+                    icon={<ShoppingBag className="text-rose-600" size={20} />}
+                    onAddPot={openAddAllocationModal}
+                    onEditPot={openEditAllocationModal}
+                    onDeletePot={handleDeleteAllocation}
+                />
+                </div>
+            )}
 
             {/* Modals */}
             <ManageAccountsModal
                 isOpen={isManageAccountsOpen}
                 onClose={() => setIsManageAccountsOpen(false)}
-                onAccountsChanged={fetchData}
+                onAccountsChanged={invalidate}
             />
 
             <AllocationModal
                 isOpen={isAllocationModalOpen}
                 onClose={() => setIsAllocationModalOpen(false)}
-                onAllocationsChanged={fetchData}
+                onAllocationsChanged={invalidate}
                 initialAccountId={modalAccountId}
                 editingAllocation={editingAllocation}
             />
@@ -216,7 +210,7 @@ const AccountCategorySection: React.FC<AccountCategorySectionProps> = ({
         indigo: { header: 'bg-indigo-50 border-indigo-100', text: 'text-indigo-700' },
     }[color];
 
-    const totalAllocated = accounts.reduce((sum, acc) => sum + Number(acc.allocatedAmount), 0);
+    const totalAllocated = allocations.filter(pot => accounts.some(acc => acc.id === pot.accountId)).reduce((sum, p) => sum + Number(p.amount), 0);
 
     return (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -241,8 +235,6 @@ const AccountCategorySection: React.FC<AccountCategorySectionProps> = ({
             <div className="divide-y divide-slate-100 bg-slate-50/30">
                 {accounts.map(account => {
                     const accountPots = allocations.filter(a => a.accountId === account.id);
-                    const totalPots = accountPots.reduce((sum, p) => sum + Number(p.amount), 0);
-                    const unallocated = Number(account.allocatedAmount) - totalPots;
 
                     return (
                         <div key={account.id} className="p-5">
@@ -252,9 +244,7 @@ const AccountCategorySection: React.FC<AccountCategorySectionProps> = ({
                                         <Landmark size={18} className="text-slate-400" />
                                         {account.name}
                                     </h4>
-                                    <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-full border border-slate-200">
-                                        Income allocated: £{Number(account.allocatedAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                    </span>
+
                                 </div>
                                 <button
                                     onClick={() => onAddPot(account.id)}
@@ -264,18 +254,8 @@ const AccountCategorySection: React.FC<AccountCategorySectionProps> = ({
                                 </button>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                {/* Unallocated / Main Balance Card */}
-                                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
-                                    <div className="absolute top-0 left-0 w-1 h-full bg-slate-300"></div>
-                                    <p className="text-sm font-medium text-slate-500 mb-1">Main Balance / Unallocated</p>
-                                    <p className={clsx("text-lg font-bold", unallocated < 0 ? "text-rose-600" : "text-slate-900")}>
-                                        £{unallocated.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                    </p>
-                                    {unallocated < 0 && (
-                                        <p className="text-[10px] text-rose-500 font-semibold absolute bottom-2 right-3">Pots exceed allocation!</p>
-                                    )}
-                                </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+
 
                                 {/* Pots */}
                                 {accountPots.map(pot => (

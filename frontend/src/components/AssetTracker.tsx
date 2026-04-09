@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { WealthChart } from './WealthChart';
 import { ProjectionChart } from './ProjectionChart';
 import { Wallet, TrendingUp, Landmark, Plus, Settings, Gem } from 'lucide-react';
@@ -6,50 +6,36 @@ import { AddEntryModal } from './AddEntryModal';
 import { WealthSourcesModal } from './WealthSourcesModal';
 import { HistoryGrid } from './HistoryGrid';
 import { processWealthData, type WealthEntry, type ViewMode } from '../utils/dataUtils';
-import { getWealthSnapshots, getWealthSources, type WealthSource } from '../api';
 import { clsx } from 'clsx';
+import { useWealthSnapshots, useWealthSources, useQueryClient, QueryKeys } from '../hooks/queries';
 
 export const AssetTracker: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSourcesModalOpen, setIsSourcesModalOpen] = useState(false);
-    const [data, setData] = useState<WealthEntry[]>([]);
-    const [rawSnapshots, setRawSnapshots] = useState<WealthEntry[]>([]);
-    const [sources, setSources] = useState<WealthSource[]>([]);
     const [viewMode, setViewMode] = useState<ViewMode>('monthly');
-    const [error, setError] = useState<string | null>(null);
+    const queryClient = useQueryClient();
 
-    useEffect(() => {
-        fetchData();
-    }, []);
+    const { data: rawSnapshots = [], error: snapshotError } = useWealthSnapshots();
+    const { data: sources = [], error: sourcesError } = useWealthSources();
 
-    useEffect(() => {
+    const error = snapshotError || sourcesError
+        ? 'Failed to connect to backend. Please ensure the server is running.'
+        : null;
+
+    const data = useMemo(() => {
         if (rawSnapshots.length > 0 && sources.length > 0) {
-            const processed = processWealthData(rawSnapshots, sources, viewMode);
-            setData(processed);
+            return processWealthData(rawSnapshots, sources, viewMode);
         }
+        return [];
     }, [rawSnapshots, sources, viewMode]);
 
-    const fetchData = async () => {
-        try {
-            const [snapshots, sourcesData] = await Promise.all([
-                getWealthSnapshots(),
-                getWealthSources()
-            ]);
-            setRawSnapshots(snapshots);
-            setSources(sourcesData);
-            setError(null);
-        } catch (error) {
-            console.error('Failed to fetch wealth data', error);
-            setError('Failed to connect to backend. Please ensure the server is running.');
-        }
-    };
-
-    const handleAddEntry = async () => {
-        await fetchData();
+    const handleAddEntry = () => {
+        queryClient.invalidateQueries({ queryKey: QueryKeys.wealthSnapshots });
     };
 
     const handleSourcesChanged = () => {
-        fetchData();
+        queryClient.invalidateQueries({ queryKey: QueryKeys.wealthSources });
+        queryClient.invalidateQueries({ queryKey: QueryKeys.wealthSnapshots });
     };
 
     // Get the latest entry with actual data (not estimated and not all zeros)

@@ -15,4 +15,14 @@ export class BackupController {
     async importBackup(@Body() element: BackupDataDto) {
         return this.backupService.importFullBackup(element);
     }
+
+    @Get('can-revert')
+    async canRevert() {
+        return { canRevert: await this.backupService.canRevert() };
+    }
+
+    @Post('revert')
+    async revertBackup() {
+        return this.backupService.revertBackup();
+    }
 }

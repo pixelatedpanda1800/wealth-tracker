@@ -43,21 +43,6 @@ export const deleteWealthSource = async (id: string): Promise<void> => {
     await api.delete(`/wealth/sources/${id}`);
 };
 
-export const exportData = async (): Promise<string> => {
-    const response = await api.get<{ csv: string }>('/wealth/export');
-    return response.data.csv;
-};
-
-export interface ImportResult {
-    rowsProcessed: number;
-    newSources: string[];
-}
-
-export const importData = async (csv: string): Promise<ImportResult> => {
-    const response = await api.post<ImportResult>('/wealth/import', { csv });
-    return response.data;
-};
-
 // === BACKUP API ===
 
 export interface BackupData {
@@ -73,6 +58,16 @@ export const exportFullBackup = async (): Promise<BackupData> => {
 
 export const importFullBackup = async (data: BackupData): Promise<{ success: boolean; message: string }> => {
     const response = await api.post<{ success: boolean; message: string }>('/backup/import', data);
+    return response.data;
+};
+
+export const canRevertBackup = async (): Promise<boolean> => {
+    const response = await api.get<{ canRevert: boolean }>('/backup/can-revert');
+    return response.data.canRevert;
+};
+
+export const revertBackup = async (): Promise<{ success: boolean; message: string }> => {
+    const response = await api.post<{ success: boolean; message: string }>('/backup/revert');
     return response.data;
 };
 
@@ -139,7 +134,7 @@ export const deleteOutgoing = async (id: string): Promise<void> => {
     await api.delete(`/budget/outgoings/${id}`);
 };
 // Accounts
-export type AccountCategory = 'non-negotiable' | 'required' | 'optional' | 'savings' | 'spending';
+export type AccountCategory = 'investment' | 'spending' | 'saving' | 'outgoings';
 
 export interface Account {
     id: string;

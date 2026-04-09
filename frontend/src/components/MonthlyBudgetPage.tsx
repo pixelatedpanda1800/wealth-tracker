@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
     Settings, Banknote, Home, ShoppingBag, Coins, PiggyBank,
     Loader2, AlertCircle
@@ -10,63 +10,48 @@ import { SavingsSection } from './budget/SavingsSection';
 
 import { BudgetAllocationTab } from './budget/BudgetAllocationTab';
 import { BudgetSourcesModal } from './budget/BudgetSourcesModal';
-import type { BudgetData, OutgoingItem, IncomeItem } from './budget/types';
-import { getIncomes, getOutgoings, getWealthSources, type IncomeSource, type OutgoingSource, type WealthSource } from '../api';
+import type { OutgoingItem, IncomeItem } from './budget/types';
 import { clsx } from 'clsx';
+import { useIncomes, useOutgoings, useWealthSources, useQueryClient, QueryKeys } from '../hooks/queries';
 
 export const MonthlyBudgetPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'budget' | 'allocation'>('budget');
     const [isSourcesModalOpen, setIsSourcesModalOpen] = useState(false);
-    const [data, setData] = useState<BudgetData>({ incomes: [], outgoings: [] });
-    const [wealthSources, setWealthSources] = useState<WealthSource[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const queryClient = useQueryClient();
 
-    useEffect(() => {
-        fetchData();
-    }, []);
+    const { data: incomeData = [], isLoading: incomesLoading, error: incomesError } = useIncomes();
+    const { data: outgoingData = [], isLoading: outgoingsLoading, error: outgoingsError } = useOutgoings();
+    const { data: wealthSources = [], isLoading: wealthLoading } = useWealthSources();
 
-    const fetchData = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            const [incomeData, outgoingData, wealthData] = await Promise.all([
-                getIncomes(),
-                getOutgoings(),
-                getWealthSources()
-            ]);
+    const loading = incomesLoading || outgoingsLoading || wealthLoading;
+    const error = incomesError || outgoingsError
+        ? 'Failed to load budget data. Please ensure the backend is running.'
+        : null;
 
-            // Map API types to component types
-            const incomes: IncomeItem[] = incomeData.map((i: IncomeSource) => ({
-                id: i.id,
-                name: i.name,
-                category: i.category,
-                amount: Number(i.amount)
-            }));
-
-            const outgoings: OutgoingItem[] = outgoingData.map((o: OutgoingSource) => ({
-                id: o.id,
-                name: o.name,
-                type: o.type,
-                frequency: o.frequency,
-                amount: Number(o.amount),
-                paymentDate: o.paymentDate,
-                notes: o.notes,
-                wealthSourceId: o.wealthSourceId
-            }));
-
-            setData({ incomes, outgoings });
-            setWealthSources(wealthData);
-        } catch (err) {
-            console.error('Failed to fetch budget data', err);
-            setError('Failed to load budget data. Please ensure the backend is running.');
-        } finally {
-            setLoading(false);
-        }
-    };
+    const data = useMemo(() => {
+        const incomes: IncomeItem[] = incomeData.map(i => ({
+            id: i.id,
+            name: i.name,
+            category: i.category,
+            amount: Number(i.amount),
+        }));
+        const outgoings: OutgoingItem[] = outgoingData.map(o => ({
+            id: o.id,
+            name: o.name,
+            type: o.type,
+            frequency: o.frequency,
+            amount: Number(o.amount),
+            paymentDate: o.paymentDate,
+            notes: o.notes,
+            wealthSourceId: o.wealthSourceId,
+        }));
+        return { incomes, outgoings };
+    }, [incomeData, outgoingData]);
 
     const handleSourcesChanged = () => {
-        fetchData();
+        queryClient.invalidateQueries({ queryKey: QueryKeys.incomes });
+        queryClient.invalidateQueries({ queryKey: QueryKeys.outgoings });
+        queryClient.invalidateQueries({ queryKey: QueryKeys.wealthSources });
     };
 
     // Calculations
@@ -129,7 +114,7 @@ export const MonthlyBudgetPage: React.FC = () => {
                         activeTab === 'allocation' ? "text-indigo-600" : "text-slate-500 hover:text-slate-700"
                     )}
                 >
-                    Budget Allocation
+                    Spending Allocation
                     {activeTab === 'allocation' && (
                         <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600 rounded-t-full" />
                     )}
@@ -212,7 +197,7 @@ export const MonthlyBudgetPage: React.FC = () => {
                     </div>
                 </div>
             ) : (
-                <BudgetAllocationTab totalIncome={totalIncome} />
+                <BudgetAllocationTab remainingToSpend={netResult} />
             )}
 
             <BudgetSourcesModal
