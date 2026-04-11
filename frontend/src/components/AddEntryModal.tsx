@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2 } from 'lucide-react';
-import { getWealthSources, saveWealthSnapshot, type WealthSource } from '../api';
+import { X, Loader2, Lock } from 'lucide-react';
+import { getWealthSources, getInvestmentHoldings, saveWealthSnapshot, type WealthSource } from '../api';
 import type { WealthEntry } from '../utils/dataUtils';
 import { MONTHS } from '../utils/constants';
 
@@ -14,6 +14,7 @@ interface AddEntryModalProps {
 export const AddEntryModal: React.FC<AddEntryModalProps> = ({ isOpen, onClose, onSubmit, existingEntries }) => {
     const currentYear = new Date().getFullYear();
     const [sources, setSources] = useState<WealthSource[]>([]);
+    const [managedSourceIds, setManagedSourceIds] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(false);
 
     const [formData, setFormData] = useState<{
@@ -58,8 +59,14 @@ export const AddEntryModal: React.FC<AddEntryModalProps> = ({ isOpen, onClose, o
     const fetchSources = async () => {
         try {
             setLoading(true);
-            const data = await getWealthSources();
+            const [data, holdings] = await Promise.all([
+                getWealthSources(),
+                getInvestmentHoldings(),
+            ]);
             setSources(data);
+            // Sources that have holdings are auto-managed — mark them read-only
+            const managedIds = new Set(holdings.map(h => h.wealthSourceId));
+            setManagedSourceIds(managedIds);
         } catch (error) {
             console.error('Failed to fetch sources', error);
         } finally {
@@ -153,9 +160,9 @@ export const AddEntryModal: React.FC<AddEntryModalProps> = ({ isOpen, onClose, o
                             </div>
                         ) : (
                             <>
-                                {cashSources.length > 0 && <SourceSection title="Cash" sources={cashSources} values={formData.values} onChange={handleChange} />}
-                                {investmentSources.length > 0 && <SourceSection title="Investments" sources={investmentSources} values={formData.values} onChange={handleChange} />}
-                                {pensionSources.length > 0 && <SourceSection title="Pensions" sources={pensionSources} values={formData.values} onChange={handleChange} />}
+                                {cashSources.length > 0 && <SourceSection title="Cash" sources={cashSources} values={formData.values} onChange={handleChange} managedSourceIds={managedSourceIds} />}
+                                {investmentSources.length > 0 && <SourceSection title="Investments" sources={investmentSources} values={formData.values} onChange={handleChange} managedSourceIds={managedSourceIds} />}
+                                {pensionSources.length > 0 && <SourceSection title="Pensions" sources={pensionSources} values={formData.values} onChange={handleChange} managedSourceIds={managedSourceIds} />}
 
                                 {sources.length === 0 && (
                                     <div className="col-span-2 py-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
@@ -189,7 +196,7 @@ export const AddEntryModal: React.FC<AddEntryModalProps> = ({ isOpen, onClose, o
     );
 };
 
-const SourceSection = ({ title, sources, values, onChange }: { title: string, sources: WealthSource[], values: Record<string, string>, onChange: any }) => (
+const SourceSection = ({ title, sources, values, onChange, managedSourceIds }: { title: string, sources: WealthSource[], values: Record<string, string>, onChange: any, managedSourceIds: Set<string> }) => (
     <div className="col-span-2 space-y-4">
         <div className="flex items-center gap-3">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">{title}</h3>
@@ -197,13 +204,17 @@ const SourceSection = ({ title, sources, values, onChange }: { title: string, so
         </div>
         <div className="grid grid-cols-2 gap-4">
             {sources.map(source => (
-                <InputField
-                    key={source.id}
-                    label={`${source.name} (£)`}
-                    name={`source_${source.id}`}
-                    value={values[source.id] || ''}
-                    onChange={onChange}
-                />
+                managedSourceIds.has(source.id) ? (
+                    <ManagedField key={source.id} label={source.name} value={values[source.id] || ''} />
+                ) : (
+                    <InputField
+                        key={source.id}
+                        label={`${source.name} (£)`}
+                        name={`source_${source.id}`}
+                        value={values[source.id] || ''}
+                        onChange={onChange}
+                    />
+                )
             ))}
         </div>
     </div>
@@ -220,5 +231,18 @@ const InputField = ({ label, name, value, onChange }: { label: string, name: str
             placeholder="0.00"
             className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm"
         />
+    </div>
+);
+
+const ManagedField = ({ label, value }: { label: string, value: string }) => (
+    <div className="space-y-2">
+        <label className="text-sm font-medium text-slate-400 flex items-center gap-1.5">
+            <Lock size={12} />
+            {label} (£)
+        </label>
+        <div className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-400 text-sm flex items-center justify-between">
+            <span>{value ? `£${Number(value).toLocaleString()}` : '—'}</span>
+            <span className="text-xs">Managed via Investments</span>
+        </div>
     </div>
 );

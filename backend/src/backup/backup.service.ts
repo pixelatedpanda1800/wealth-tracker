@@ -7,6 +7,8 @@ import { IncomeSource } from '../budget/entities/income-source.entity';
 import { OutgoingSource } from '../budget/entities/outgoing-source.entity';
 import { Account } from '../budget/entities/account.entity';
 import { Allocation } from '../budget/entities/allocation.entity';
+import { InvestmentHolding } from '../investments/entities/investment-holding.entity';
+import { InvestmentSnapshot } from '../investments/entities/investment-snapshot.entity';
 import { BackupDataDto } from './dto/backup-data.dto';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -26,6 +28,10 @@ export class BackupService {
         private accountRepo: Repository<Account>,
         @InjectRepository(Allocation)
         private allocationRepo: Repository<Allocation>,
+        @InjectRepository(InvestmentHolding)
+        private investmentHoldingRepo: Repository<InvestmentHolding>,
+        @InjectRepository(InvestmentSnapshot)
+        private investmentSnapshotRepo: Repository<InvestmentSnapshot>,
         private dataSource: DataSource,
     ) { }
 
@@ -36,7 +42,9 @@ export class BackupService {
             incomes,
             outgoings,
             accounts,
-            allocations
+            allocations,
+            investmentHoldings,
+            investmentSnapshots,
         ] = await Promise.all([
             this.wealthSourceRepo.find(),
             this.wealthSnapshotRepo.find(),
@@ -44,6 +52,8 @@ export class BackupService {
             this.outgoingRepo.find(),
             this.accountRepo.find(),
             this.allocationRepo.find(),
+            this.investmentHoldingRepo.find(),
+            this.investmentSnapshotRepo.find(),
         ]);
 
         return {
@@ -60,6 +70,10 @@ export class BackupService {
                     accounts: accounts,
                     allocations: allocations,
                 },
+                investments: {
+                    holdings: investmentHoldings,
+                    snapshots: investmentSnapshots,
+                },
             },
         };
     }
@@ -70,6 +84,8 @@ export class BackupService {
 
     private async clearAllData(manager: EntityManager): Promise<void> {
         // Reverse order of dependencies
+        await manager.createQueryBuilder().delete().from(InvestmentSnapshot).execute();
+        await manager.createQueryBuilder().delete().from(InvestmentHolding).execute();
         await manager.createQueryBuilder().delete().from(Allocation).execute();
         await manager.createQueryBuilder().delete().from(Account).execute();
         await manager.createQueryBuilder().delete().from(OutgoingSource).execute();
@@ -107,6 +123,17 @@ export class BackupService {
                 await manager.save(Allocation, allocation);
             }
         }
+        const investments = backup.data.investments;
+        if (investments?.holdings) {
+            for (const holding of investments.holdings) {
+                await manager.save(InvestmentHolding, holding);
+            }
+        }
+        if (investments?.snapshots) {
+            for (const snapshot of investments.snapshots) {
+                await manager.save(InvestmentSnapshot, snapshot);
+            }
+        }
     }
 
     async importFullBackup(backup: BackupDataDto): Promise<{
@@ -132,7 +159,7 @@ export class BackupService {
             await this.insertBackupData(backup, manager);
         });
 
-        const { wealth, budget } = backup.data;
+        const { wealth, budget, investments } = backup.data;
         return {
             success: true,
             message: 'Restore completed successfully. Previous data saved for revert if needed.',
@@ -143,6 +170,8 @@ export class BackupService {
                 outgoings: budget?.outgoings?.length || 0,
                 accounts: budget?.accounts?.length || 0,
                 allocations: budget?.allocations?.length || 0,
+                investmentHoldings: investments?.holdings?.length || 0,
+                investmentSnapshots: investments?.snapshots?.length || 0,
             },
         };
     }

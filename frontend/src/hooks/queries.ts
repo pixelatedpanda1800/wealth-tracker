@@ -6,6 +6,8 @@ import {
     getOutgoings,
     getAccounts,
     getAllocations,
+    getInvestmentHoldings,
+    getInvestmentSnapshots,
 } from '../api';
 
 export const QueryKeys = {
@@ -15,6 +17,8 @@ export const QueryKeys = {
     outgoings: ['outgoings'] as const,
     accounts: ['accounts'] as const,
     allocations: ['allocations'] as const,
+    investmentHoldings: ['investmentHoldings'] as const,
+    investmentSnapshots: ['investmentSnapshots'] as const,
 };
 
 export const useWealthSnapshots = () =>
@@ -34,5 +38,11 @@ export const useAccounts = () =>
 
 export const useAllocations = () =>
     useQuery({ queryKey: QueryKeys.allocations, queryFn: getAllocations });
+
+export const useInvestmentHoldings = () =>
+    useQuery({ queryKey: QueryKeys.investmentHoldings, queryFn: getInvestmentHoldings });
+
+export const useInvestmentSnapshots = () =>
+    useQuery({ queryKey: QueryKeys.investmentSnapshots, queryFn: () => getInvestmentSnapshots() });
 
 export { useQueryClient };

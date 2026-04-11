@@ -190,4 +190,61 @@ export const deleteAllocation = async (id: string): Promise<void> => {
     await api.delete(`/budget/allocations/${id}`);
 };
 
+// === INVESTMENTS API ===
+
+import type { InvestmentHolding, InvestmentSnapshot, HoldingType } from './components/investments/types';
+export type { InvestmentHolding, InvestmentSnapshot, HoldingType };
+
+export const getInvestmentHoldings = async (): Promise<InvestmentHolding[]> => {
+    const response = await api.get<InvestmentHolding[]>('/investments/holdings');
+    return response.data;
+};
+
+export const createInvestmentHolding = async (data: {
+    name: string;
+    ticker?: string;
+    type: HoldingType;
+    color?: string;
+    wealthSourceId: string;
+}): Promise<InvestmentHolding> => {
+    const response = await api.post<InvestmentHolding>('/investments/holdings', data);
+    return response.data;
+};
+
+export const updateInvestmentHolding = async (id: string, data: Partial<{
+    name: string;
+    ticker: string;
+    type: HoldingType;
+    color: string;
+    wealthSourceId: string;
+}>): Promise<InvestmentHolding> => {
+    const response = await api.put<InvestmentHolding>(`/investments/holdings/${id}`, data);
+    return response.data;
+};
+
+export const deleteInvestmentHolding = async (id: string): Promise<void> => {
+    await api.delete(`/investments/holdings/${id}`);
+};
+
+export const getInvestmentSnapshots = async (holdingId?: string): Promise<InvestmentSnapshot[]> => {
+    const params = holdingId ? { holdingId } : {};
+    const response = await api.get<InvestmentSnapshot[]>('/investments/snapshots', { params });
+    return response.data;
+};
+
+export const saveInvestmentSnapshot = async (data: {
+    holdingId: string;
+    year: number;
+    month: string;
+    value: number;
+    units?: number;
+    costBasis?: number;
+}): Promise<InvestmentSnapshot> => {
+    const response = await api.post<InvestmentSnapshot>('/investments/snapshots', data);
+    return response.data;
+};
+
+export const deleteInvestmentSnapshot = async (id: string): Promise<void> => {
+    await api.delete(`/investments/snapshots/${id}`);
+};
 

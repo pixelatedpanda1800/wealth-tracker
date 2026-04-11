@@ -12,6 +12,9 @@ import { OutgoingSource } from './budget/entities/outgoing-source.entity';
 import { Account } from './budget/entities/account.entity';
 import { Allocation } from './budget/entities/allocation.entity';
 import { BackupModule } from './backup/backup.module';
+import { InvestmentsModule } from './investments/investments.module';
+import { InvestmentHolding } from './investments/entities/investment-holding.entity';
+import { InvestmentSnapshot } from './investments/entities/investment-snapshot.entity';
 
 @Module({
   imports: [
@@ -46,6 +49,8 @@ import { BackupModule } from './backup/backup.module';
               OutgoingSource,
               Account,
               Allocation,
+              InvestmentHolding,
+              InvestmentSnapshot,
             ],
             synchronize: true,
           };
@@ -61,6 +66,8 @@ import { BackupModule } from './backup/backup.module';
             OutgoingSource,
             Account,
             Allocation,
+            InvestmentHolding,
+            InvestmentSnapshot,
           ],
           synchronize: true,
         };
@@ -68,6 +75,7 @@ import { BackupModule } from './backup/backup.module';
     }),
     WealthModule,
     BudgetModule,
+    InvestmentsModule,
     BackupModule,
   ],
 })

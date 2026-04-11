@@ -8,6 +8,8 @@ import { IncomeSource } from '../budget/entities/income-source.entity';
 import { OutgoingSource } from '../budget/entities/outgoing-source.entity';
 import { Account } from '../budget/entities/account.entity';
 import { Allocation } from '../budget/entities/allocation.entity';
+import { InvestmentHolding } from '../investments/entities/investment-holding.entity';
+import { InvestmentSnapshot } from '../investments/entities/investment-snapshot.entity';
 
 @Module({
     imports: [
@@ -18,6 +20,8 @@ import { Allocation } from '../budget/entities/allocation.entity';
             OutgoingSource,
             Account,
             Allocation,
+            InvestmentHolding,
+            InvestmentSnapshot,
         ]),
     ],
     controllers: [BackupController],
