@@ -9,7 +9,7 @@ export class CreateHoldingDto {
   ticker?: string;
 
   @IsString()
-  @IsIn(['fund', 'etf', 'stock', 'bond', 'other'])
+  @IsIn(['fund', 'etf', 'stock', 'bond', 'crypto', 'other'])
   type: string;
 
   @IsString()

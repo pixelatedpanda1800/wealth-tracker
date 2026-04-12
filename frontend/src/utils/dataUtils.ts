@@ -45,15 +45,36 @@ export const processWealthData = (data: WealthEntry[], sources: WealthSource[], 
         return MONTHS.indexOf(a.month) - MONTHS.indexOf(b.month);
     });
 
-    // Helper to calculate aggregations for an entry
+    // Helper to calculate aggregations for an entry.
+    // If a source is absent from the entry's values (e.g. a partial snapshot
+    // written by the investment tracker that omits cash/pension sources), carry
+    // its value forward from the most recent prior entry that recorded it.
     const aggregateEntry = (entry: WealthEntry): WealthEntry => {
         let cash = 0;
         let investment = 0;
         let pension = 0;
 
-        Object.entries(entry.values || {}).forEach(([sourceId, value]) => {
-            const source = sources.find(s => s.id === sourceId);
-            if (source) {
+        const entryIndex = entry.year * 12 + MONTHS.indexOf(entry.month);
+        // Prior entries sorted most-recent-first for efficient carry-forward lookup
+        const priorEntries = sortedData
+            .filter(e => e.year * 12 + MONTHS.indexOf(e.month) < entryIndex)
+            .reverse();
+
+        sources.forEach(source => {
+            let value = entry.values?.[source.id];
+
+            if (value == null) {
+                // No value recorded for this source this month — find the most
+                // recent prior entry that has one and carry it forward.
+                for (const prior of priorEntries) {
+                    if (prior.values?.[source.id] != null) {
+                        value = prior.values[source.id];
+                        break;
+                    }
+                }
+            }
+
+            if (value != null) {
                 if (source.category === 'cash') cash += value;
                 else if (source.category === 'investment') investment += value;
                 else if (source.category === 'pension') pension += value;

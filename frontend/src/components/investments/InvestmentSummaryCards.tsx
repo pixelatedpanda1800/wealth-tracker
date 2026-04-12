@@ -14,7 +14,7 @@ export const InvestmentSummaryCards: React.FC<InvestmentSummaryCardsProps> = ({ 
     const fmtPct = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`;
 
     return (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="h-full grid grid-cols-2 grid-rows-2 gap-4">
             <StatCard
                 title="Total Value"
                 value={fmt(totalValue)}
@@ -84,7 +84,7 @@ const colorMap = {
 const StatCard: React.FC<StatCardProps> = ({ title, value, subtitle, trend, icon, color }) => {
     const c = colorMap[color];
     return (
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+        <div className="h-full bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
             <div className="flex items-start justify-between mb-3">
                 <div className={clsx('p-2 rounded-xl', c.bg)}>
                     <span className={c.icon}>{icon}</span>

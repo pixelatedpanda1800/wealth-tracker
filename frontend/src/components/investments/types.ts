@@ -1,4 +1,4 @@
-export type HoldingType = 'fund' | 'etf' | 'stock' | 'bond' | 'other';
+export type HoldingType = 'fund' | 'etf' | 'stock' | 'bond' | 'crypto' | 'other';
 
 export interface InvestmentHolding {
     id: string;
@@ -35,5 +35,6 @@ export const HOLDING_TYPE_LABELS: Record<HoldingType, string> = {
     etf: 'ETF',
     stock: 'Stock',
     bond: 'Bond',
+    crypto: 'Crypto',
     other: 'Other',
 };

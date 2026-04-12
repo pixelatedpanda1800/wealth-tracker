@@ -14,6 +14,7 @@ export enum HoldingType {
   ETF = 'etf',
   STOCK = 'stock',
   BOND = 'bond',
+  CRYPTO = 'crypto',
   OTHER = 'other',
 }
 

@@ -19,6 +19,7 @@ import {
     calculatePortfolioSummary,
     detectWarnings,
     groupHoldingsByAccount,
+    groupHoldingsByTicker,
     type Period,
     PERIOD_LABELS,
 } from '../utils/investmentUtils';
@@ -36,10 +37,14 @@ export const InvestmentsPage: React.FC = () => {
     const [period, setPeriod] = useState<Period>('1Y');
 
     // Refs for scroll-to-holding from warning alerts
+    // A grouped card registers all its holding IDs under the same element ref
     const holdingRefs = useRef<Record<string, HTMLDivElement | null>>({});
-    const setHoldingRef = useCallback((id: string) => (el: HTMLDivElement | null) => {
-        holdingRefs.current[id] = el;
-    }, []);
+    const setGroupRef = useCallback(
+        (ids: string[]) => (el: HTMLDivElement | null) => {
+            ids.forEach(id => { holdingRefs.current[id] = el; });
+        },
+        [],
+    );
 
     const scrollToHolding = (holdingId: string) => {
         holdingRefs.current[holdingId]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -55,6 +60,7 @@ export const InvestmentsPage: React.FC = () => {
     const hasSnapshots = snapshots.length > 0;
 
     const accountGroups = groupHoldingsByAccount(holdings, wealthSources);
+    const tickerGroups = groupHoldingsByTicker(holdings);
     const summary = calculatePortfolioSummary(holdings, snapshots);
     const warnings = hasSnapshots ? detectWarnings(holdings, snapshots) : [];
 
@@ -148,29 +154,33 @@ export const InvestmentsPage: React.FC = () => {
                         />
                     )}
 
-                    {/* Summary cards */}
+                    {/* Top section: summary cards (left) + allocation breakdown (right) */}
                     {hasSnapshots && (
-                        <InvestmentSummaryCards summary={summary} />
-                    )}
-
-                    {/* Account charts */}
-                    {hasSnapshots && accountGroups.length > 0 && (
-                        <div className="space-y-4">
-                            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Account Overview</h3>
-                            {accountGroups.map(({ source, holdings: accountHoldings }) => (
-                                <AccountChart
-                                    key={source.id}
-                                    source={source}
-                                    holdings={accountHoldings}
-                                    snapshots={snapshots}
-                                />
-                            ))}
+                        <div className="grid grid-cols-3 gap-6">
+                            <div className="col-span-2 h-full">
+                                <InvestmentSummaryCards summary={summary} />
+                            </div>
+                            <div className="col-span-1">
+                                <AllocationChart holdings={holdings} snapshots={snapshots} />
+                            </div>
                         </div>
                     )}
 
-                    {/* Allocation pie */}
-                    {hasSnapshots && (
-                        <AllocationChart holdings={holdings} snapshots={snapshots} />
+                    {/* Account charts — two per row */}
+                    {hasSnapshots && accountGroups.length > 0 && (
+                        <div className="space-y-4">
+                            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Account Overview</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                {accountGroups.map(({ source, holdings: accountHoldings }) => (
+                                    <AccountChart
+                                        key={source.id}
+                                        source={source}
+                                        holdings={accountHoldings}
+                                        snapshots={snapshots}
+                                    />
+                                ))}
+                            </div>
+                        </div>
                     )}
 
                     {/* Period selector + holding performance cards */}
@@ -198,16 +208,20 @@ export const InvestmentsPage: React.FC = () => {
 
                         {hasSnapshots ? (
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                {holdings.map((holding, index) => (
-                                    <div key={holding.id} ref={setHoldingRef(holding.id)}>
-                                        <HoldingPerformanceCard
-                                            holding={holding}
-                                            snapshots={snapshots}
-                                            period={period}
-                                            index={index}
-                                        />
-                                    </div>
-                                ))}
+                                {tickerGroups.filter(g => g.ticker !== null).map((group, index) => {
+                                    const key = group.ticker ?? group.holdings[0].id;
+                                    const ids = group.holdings.map(h => h.id);
+                                    return (
+                                        <div key={key} ref={setGroupRef(ids)}>
+                                            <HoldingPerformanceCard
+                                                holdings={group.holdings}
+                                                snapshots={snapshots}
+                                                period={period}
+                                                index={index}
+                                            />
+                                        </div>
+                                    );
+                                })}
                             </div>
                         ) : (
                             <div className="bg-white p-8 rounded-2xl border border-dashed border-slate-200 text-center">

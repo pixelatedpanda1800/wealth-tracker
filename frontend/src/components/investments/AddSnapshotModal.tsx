@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, Info } from 'lucide-react';
 import { saveInvestmentSnapshot, type InvestmentHolding, type InvestmentSnapshot } from '../../api';
 import { MONTHS } from '../../utils/constants';
 import { HOLDING_TYPE_LABELS } from './types';
@@ -34,18 +34,37 @@ export const AddSnapshotModal: React.FC<AddSnapshotModalProps> = ({
 
     const years = [currentYear - 2, currentYear - 1, currentYear, currentYear + 1];
 
-    // Populate fields when month/year or holdings change
+    // Populate fields when month/year or holdings change.
+    // Priority: (1) exact match for selected period, (2) most recent prior snapshot, (3) blank.
     useEffect(() => {
+        const selectedIndex = Number(year) * 12 + MONTHS.indexOf(month as any);
+
         const newFields: FieldValues = {};
         for (const holding of holdings) {
-            const existing = existingSnapshots.find(
-                s => s.holdingId === holding.id && s.year === Number(year) && s.month === month
+            const holdingSnaps = existingSnapshots.filter(s => s.holdingId === holding.id);
+
+            const exact = holdingSnaps.find(
+                s => s.year === Number(year) && s.month === month
             );
-            newFields[holding.id] = {
-                value: existing ? existing.value.toString() : '',
-                units: existing?.units != null ? existing.units.toString() : '',
-                costBasis: existing?.costBasis != null ? existing.costBasis.toString() : '',
-            };
+
+            if (exact) {
+                newFields[holding.id] = {
+                    value: exact.value.toString(),
+                    units: exact.units != null ? exact.units.toString() : '',
+                    costBasis: exact.costBasis != null ? exact.costBasis.toString() : '',
+                };
+            } else {
+                // Find the most recent snapshot strictly before the selected period
+                const prior = holdingSnaps
+                    .filter(s => s.year * 12 + MONTHS.indexOf(s.month as any) < selectedIndex)
+                    .sort((a, b) => (b.year * 12 + MONTHS.indexOf(b.month as any)) - (a.year * 12 + MONTHS.indexOf(a.month as any)))[0];
+
+                newFields[holding.id] = {
+                    value: prior ? prior.value.toString() : '',
+                    units: prior?.units != null ? prior.units.toString() : '',
+                    costBasis: prior?.costBasis != null ? prior.costBasis.toString() : '',
+                };
+            }
         }
         setFields(newFields);
     }, [month, year, holdings, existingSnapshots]);
@@ -169,7 +188,16 @@ export const AddSnapshotModal: React.FC<AddSnapshotModalProps> = ({
                                                     />
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <label className="text-xs font-medium text-slate-500">Cost Basis (£)</label>
+                                                    <label className="text-xs font-medium text-slate-500 flex items-center gap-1">
+                                                        Cost Basis (£)
+                                                        <span className="relative group/tooltip">
+                                                            <Info size={11} className="text-slate-400 cursor-help" />
+                                                            <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 rounded-xl bg-slate-800 px-3 py-2.5 text-xs text-slate-100 leading-relaxed opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-150 z-50 shadow-lg">
+                                                                The total amount you have <span className="font-semibold text-white">paid in</span> — i.e. the sum of all contributions or purchase costs, not the current market value. Used to calculate your real return.
+                                                                <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
+                                                            </span>
+                                                        </span>
+                                                    </label>
                                                     <input
                                                         type="number"
                                                         placeholder="optional"

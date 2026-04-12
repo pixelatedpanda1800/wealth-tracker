@@ -45,6 +45,21 @@ const periodCutoff = (period: Period): number => {
 const snapshotIndex = (s: InvestmentSnapshot) =>
     s.year * 12 + MONTHS.indexOf(s.month as any);
 
+/**
+ * Returns a copy of the sorted snapshot array where each entry's costBasis is
+ * the most recently recorded non-null value (carried forward from earlier snapshots).
+ * Snapshots before any cost basis was ever entered keep null.
+ */
+const carryForwardCostBasis = (
+    sortedSnaps: InvestmentSnapshot[],
+): (InvestmentSnapshot & { resolvedCostBasis: number | null })[] => {
+    let last: number | null = null;
+    return sortedSnaps.map(s => {
+        if (s.costBasis != null) last = Number(s.costBasis);
+        return { ...s, resolvedCostBasis: last };
+    });
+};
+
 // Filter snapshots for a holding to those within the period
 export const filterSnapshotsByPeriod = (
     snapshots: InvestmentSnapshot[],
@@ -91,7 +106,9 @@ export const calculateHoldingStats = (
     const change = currentValue - periodStartValue;
     const changePct = periodStartValue > 0 ? (change / periodStartValue) * 100 : 0;
 
-    const costBasis = latest?.costBasis != null ? Number(latest.costBasis) : null;
+    // Use the most recent snapshot that has a cost basis recorded — not just the latest
+    const latestWithBasis = [...allForHolding].reverse().find(s => s.costBasis != null);
+    const costBasis = latestWithBasis != null ? Number(latestWithBasis.costBasis) : null;
     const gainLoss = costBasis !== null ? currentValue - costBasis : null;
     const returnPct = costBasis != null && costBasis > 0 ? ((currentValue - costBasis) / costBasis) * 100 : null;
 
@@ -113,6 +130,7 @@ export const calculatePortfolioSummary = (
     snapshots: InvestmentSnapshot[],
 ): PortfolioSummary => {
     let totalValue = 0;
+    let costedValue = 0;  // current value of only those holdings with a cost basis
     let totalCostBasis = 0;
     let hasCostBasis = false;
     let monthlyChange = 0;
@@ -122,14 +140,17 @@ export const calculatePortfolioSummary = (
         totalValue += stats.currentValue;
         monthlyChange += stats.change;
         if (stats.costBasis !== null) {
+            costedValue += stats.currentValue;
             totalCostBasis += stats.costBasis;
             hasCostBasis = true;
         }
     }
 
-    const totalGainLoss = hasCostBasis ? totalValue - totalCostBasis : null;
+    // Only compare like-for-like: gain/loss uses only the subset of holdings
+    // that have cost basis data, preventing uncosted holdings inflating the return.
+    const totalGainLoss = hasCostBasis ? costedValue - totalCostBasis : null;
     const totalReturnPct = hasCostBasis && totalCostBasis > 0
-        ? ((totalValue - totalCostBasis) / totalCostBasis) * 100
+        ? ((costedValue - totalCostBasis) / totalCostBasis) * 100
         : null;
 
     return {
@@ -200,6 +221,7 @@ const TYPE_COLORS: Record<string, string> = {
     etf: '#10B981',
     stock: '#F59E0B',
     bond: '#64748B',
+    crypto: '#F7931A',
     other: '#EC4899',
 };
 
@@ -248,12 +270,16 @@ export const detectWarnings = (
         const holdingSnaps = sortSnapshots(snapshots.filter(s => s.holdingId === holding.id));
         if (holdingSnaps.length < 6) continue; // insufficient data
 
-        const latest = holdingSnaps[holdingSnaps.length - 1];
+        // Resolve cost basis for every snapshot, carrying forward the most recent
+        // non-null entry so gaps in data entry don't silently zero-out the basis.
+        const resolved = carryForwardCostBasis(holdingSnaps);
+
+        const latest = resolved[resolved.length - 1];
         const currentValue = Number(latest.value);
-        const hasCostBasis = holdingSnaps.some(s => s.costBasis != null);
+        const hasCostBasis = resolved.some(s => s.resolvedCostBasis != null);
 
         // Last 12 months of data (or all if fewer)
-        const last12 = holdingSnaps.slice(-12);
+        const last12 = resolved.slice(-12);
         const name = holding.name;
 
         // ── Indicator 1: Deposit-Masked Growth (Critical) ──────────────────────
@@ -264,8 +290,8 @@ export const detectWarnings = (
             const totalValueIncrease = Number(last.value) - Number(first.value);
 
             if (totalValueIncrease > 0) {
-                const firstBasis = first.costBasis != null ? Number(first.costBasis) : null;
-                const lastBasis = last.costBasis != null ? Number(last.costBasis) : null;
+                const firstBasis = first.resolvedCostBasis;
+                const lastBasis = last.resolvedCostBasis;
 
                 if (firstBasis !== null && lastBasis !== null) {
                     const depositIncrease = lastBasis - firstBasis;
@@ -304,8 +330,8 @@ export const detectWarnings = (
 
             const valueChange = Number(curr.value) - Number(prev.value);
             const depositChange =
-                curr.costBasis != null && prev.costBasis != null
-                    ? Number(curr.costBasis) - Number(prev.costBasis)
+                curr.resolvedCostBasis != null && prev.resolvedCostBasis != null
+                    ? curr.resolvedCostBasis - prev.resolvedCostBasis
                     : 0;
             const realReturn = valueChange - depositChange;
 
@@ -329,8 +355,8 @@ export const detectWarnings = (
 
         // ── Indicator 3: Underwater Position (Critical) ────────────────────────
         // Requires costBasis. Fires when current value < total invested.
-        if (latest.costBasis != null) {
-            const costBasis = Number(latest.costBasis);
+        if (latest.resolvedCostBasis != null) {
+            const costBasis = latest.resolvedCostBasis;
             if (costBasis > 0 && currentValue < costBasis) {
                 const lossAmount = costBasis - currentValue;
                 const lossPct = (lossAmount / costBasis) * 100;
@@ -352,8 +378,8 @@ export const detectWarnings = (
             const last = last12[last12.length - 1];
             const valueChange = Number(last.value) - Number(first.value);
             const depositChange =
-                first.costBasis != null && last.costBasis != null
-                    ? Number(last.costBasis) - Number(first.costBasis)
+                first.resolvedCostBasis != null && last.resolvedCostBasis != null
+                    ? last.resolvedCostBasis - first.resolvedCostBasis
                     : 0;
             const realReturn = valueChange - depositChange;
             const startValue = Number(first.value);
@@ -373,28 +399,20 @@ export const detectWarnings = (
         // ── Indicator 5: Significant Drawdown (Warning) ────────────────────────
         // Fires when current deposit-adjusted value is >15% below its peak.
         // Uses raw value if no costBasis available.
-        const peakSnap = holdingSnaps.reduce((best, snap) => {
-            // Adjust value by removing cumulative deposits relative to the first snapshot
-            const base = holdingSnaps[0];
-            const depositsSinceStart =
-                snap.costBasis != null && base.costBasis != null
-                    ? Number(snap.costBasis) - Number(base.costBasis)
-                    : 0;
+        const baseResolved = resolved[0].resolvedCostBasis ?? 0;
+
+        const peakSnap = resolved.reduce((best, snap) => {
+            const depositsSinceStart = (snap.resolvedCostBasis ?? baseResolved) - baseResolved;
             const adjusted = Number(snap.value) - depositsSinceStart;
-            const bestBase = holdingSnaps[0];
-            const bestDeposits =
-                best.costBasis != null && bestBase.costBasis != null
-                    ? Number(best.costBasis) - Number(bestBase.costBasis)
-                    : 0;
+            const bestDeposits = (best.resolvedCostBasis ?? baseResolved) - baseResolved;
             const bestAdjusted = Number(best.value) - bestDeposits;
             return adjusted > bestAdjusted ? snap : best;
-        }, holdingSnaps[0]);
+        }, resolved[0]);
 
-        const baseCostBasis = holdingSnaps[0].costBasis != null ? Number(holdingSnaps[0].costBasis) : 0;
-        const peakCostBasis = peakSnap.costBasis != null ? Number(peakSnap.costBasis) : 0;
-        const peakAdjusted = Number(peakSnap.value) - (peakCostBasis - baseCostBasis);
-        const currentCostBasis = latest.costBasis != null ? Number(latest.costBasis) : 0;
-        const currentAdjusted = currentValue - (currentCostBasis - baseCostBasis);
+        const peakDeposits = (peakSnap.resolvedCostBasis ?? baseResolved) - baseResolved;
+        const peakAdjusted = Number(peakSnap.value) - peakDeposits;
+        const currentDeposits = (latest.resolvedCostBasis ?? baseResolved) - baseResolved;
+        const currentAdjusted = currentValue - currentDeposits;
 
         if (peakAdjusted > 0 && peakSnap.id !== latest.id) {
             const drawdownPct = ((peakAdjusted - currentAdjusted) / peakAdjusted) * 100;
@@ -419,6 +437,86 @@ export const detectWarnings = (
 
 export const holdingColor = (holding: InvestmentHolding, index: number) =>
     holding.color || getDefaultColor(index);
+
+// --- Group holdings by ticker ---
+
+export interface HoldingGroup {
+    /** Shared ticker, or null for ungrouped (no-ticker) holdings */
+    ticker: string | null;
+    holdings: InvestmentHolding[];
+}
+
+/**
+ * Holdings that share a ticker are collapsed into a single group.
+ * Holdings without a ticker each get their own group.
+ * Original order is preserved (first occurrence of a ticker determines position).
+ */
+export const groupHoldingsByTicker = (holdings: InvestmentHolding[]): HoldingGroup[] => {
+    const tickerMap = new Map<string, InvestmentHolding[]>();
+    const groups: HoldingGroup[] = [];
+
+    for (const holding of holdings) {
+        if (holding.ticker) {
+            const key = holding.ticker.toUpperCase();
+            if (!tickerMap.has(key)) {
+                const list: InvestmentHolding[] = [];
+                tickerMap.set(key, list);
+                groups.push({ ticker: key, holdings: list });
+            }
+            tickerMap.get(key)!.push(holding);
+        } else {
+            groups.push({ ticker: null, holdings: [holding] });
+        }
+    }
+
+    return groups;
+};
+
+/** Aggregate HoldingStats across all holdings in a group */
+export const calculateGroupStats = (
+    holdings: InvestmentHolding[],
+    snapshots: InvestmentSnapshot[],
+    period: Period,
+): HoldingStats => {
+    let totalCurrentValue = 0;
+    let totalPreviousValue = 0;
+    let totalPeriodStartValue = 0;
+    let totalCostBasis = 0;
+    // All holdings in the group must have a cost basis — partial data produces
+    // misleading gain/loss figures (e.g. one AAPL account costed, another not).
+    let allHaveCostBasis = holdings.length > 0;
+
+    for (const holding of holdings) {
+        const stats = calculateHoldingStats(snapshots, holding.id, period);
+        totalCurrentValue += stats.currentValue;
+        totalPreviousValue += stats.previousValue;
+        totalPeriodStartValue += stats.periodStartValue;
+        if (stats.costBasis !== null) {
+            totalCostBasis += stats.costBasis;
+        } else {
+            allHaveCostBasis = false;
+        }
+    }
+
+    const change = totalCurrentValue - totalPeriodStartValue;
+    const changePct = totalPeriodStartValue > 0 ? (change / totalPeriodStartValue) * 100 : 0;
+    const costBasis = allHaveCostBasis ? totalCostBasis : null;
+    const gainLoss = costBasis !== null ? totalCurrentValue - costBasis : null;
+    const returnPct = costBasis != null && costBasis > 0
+        ? ((totalCurrentValue - costBasis) / costBasis) * 100
+        : null;
+
+    return {
+        currentValue: totalCurrentValue,
+        previousValue: totalPreviousValue,
+        change,
+        changePct,
+        periodStartValue: totalPeriodStartValue,
+        costBasis,
+        gainLoss,
+        returnPct,
+    };
+};
 
 // --- Group holdings by account ---
 

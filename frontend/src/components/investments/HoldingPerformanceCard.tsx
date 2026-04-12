@@ -8,33 +8,38 @@ import type { InvestmentHolding, InvestmentSnapshot } from './types';
 import { HOLDING_TYPE_LABELS } from './types';
 import { TradingViewWidget } from './TradingViewWidget';
 import {
-    calculateHoldingStats,
+    calculateGroupStats,
     filterSnapshotsByPeriod,
     holdingColor,
     type Period,
 } from '../../utils/investmentUtils';
 
 interface HoldingPerformanceCardProps {
-    holding: InvestmentHolding;
+    holdings: InvestmentHolding[];
     snapshots: InvestmentSnapshot[];
     period: Period;
     index: number;
 }
 
 export const HoldingPerformanceCard: React.FC<HoldingPerformanceCardProps> = ({
-    holding, snapshots, period, index,
+    holdings, snapshots, period, index,
 }) => {
-    const stats = calculateHoldingStats(snapshots, holding.id, period);
-    const periodSnaps = filterSnapshotsByPeriod(snapshots, holding.id, period);
-    const color = holdingColor(holding, index);
-    const hasTicker = !!holding.ticker;
+    const primary = holdings[0];
+    const isGrouped = holdings.length > 1;
+    const ticker = primary.ticker ?? null;
+
+    const stats = calculateGroupStats(holdings, snapshots, period);
+    // For the fallback chart use the first (and only) holding's snapshots
+    const periodSnaps = filterSnapshotsByPeriod(snapshots, primary.id, period);
+    const color = holdingColor(primary, index);
+    const hasTicker = !!ticker;
 
     const isPositive = stats.change >= 0;
     const fmt = (n: number) =>
         `£${Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     const fmtPct = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`;
 
-    // Build fallback chart data from snapshots
+    // Build fallback chart data from snapshots (single-holding groups only)
     const chartData = periodSnaps.map(s => ({
         label: `${s.month} '${s.year.toString().slice(-2)}`,
         value: Number(s.value),
@@ -47,28 +52,39 @@ export const HoldingPerformanceCard: React.FC<HoldingPerformanceCardProps> = ({
                 <div className="flex items-center gap-3 min-w-0">
                     <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
                     <div className="min-w-0">
-                        <p className="font-semibold text-slate-800 truncate">{holding.name}</p>
+                        <p className="font-semibold text-slate-800 truncate">{primary.name}</p>
                         <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-xs text-slate-400 bg-slate-100 rounded-md px-2 py-0.5">
-                                {HOLDING_TYPE_LABELS[holding.type]}
+                                {HOLDING_TYPE_LABELS[primary.type]}
                             </span>
-                            {holding.ticker && (
-                                <span className="text-xs font-mono text-slate-500">{holding.ticker}</span>
+                            {ticker && (
+                                <span className="text-xs font-mono text-slate-500">{ticker}</span>
                             )}
                         </div>
                     </div>
                 </div>
-                {holding.wealthSource && (
-                    <span className="text-xs text-slate-400 bg-slate-50 border border-slate-100 rounded-lg px-2 py-1 flex-shrink-0">
-                        {holding.wealthSource.name}
-                    </span>
+                {/* Account badge(s) */}
+                {isGrouped ? (
+                    <div className="flex flex-wrap gap-1 justify-end flex-shrink-0">
+                        {holdings.map(h => h.wealthSource && (
+                            <span key={h.id} className="text-xs text-slate-400 bg-slate-50 border border-slate-100 rounded-lg px-2 py-1">
+                                {h.wealthSource.name}
+                            </span>
+                        ))}
+                    </div>
+                ) : (
+                    primary.wealthSource && (
+                        <span className="text-xs text-slate-400 bg-slate-50 border border-slate-100 rounded-lg px-2 py-1 flex-shrink-0">
+                            {primary.wealthSource.name}
+                        </span>
+                    )
                 )}
             </div>
 
             {/* Chart area */}
             <div className="px-5">
                 {hasTicker ? (
-                    <TradingViewWidget ticker={holding.ticker!} period={period} />
+                    <TradingViewWidget ticker={ticker!} period={period} />
                 ) : chartData.length >= 2 ? (
                     <div className="h-48">
                         <ResponsiveContainer width="100%" height="100%">

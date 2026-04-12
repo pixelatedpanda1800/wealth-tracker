@@ -16,7 +16,7 @@ const PRESET_COLORS = [
     '#84CC16', '#EAB308', '#3B82F6', '#A855F7', '#D946EF', '#F43F5E',
 ];
 
-const HOLDING_TYPES: HoldingType[] = ['fund', 'etf', 'stock', 'bond', 'other'];
+const HOLDING_TYPES: HoldingType[] = ['fund', 'etf', 'stock', 'bond', 'crypto', 'other'];
 
 interface ManageHoldingsModalProps {
     isOpen: boolean;
