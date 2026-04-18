@@ -248,3 +248,110 @@ export const deleteInvestmentSnapshot = async (id: string): Promise<void> => {
     await api.delete(`/investments/snapshots/${id}`);
 };
 
+// === LIABILITIES API ===
+
+import type {
+    Property,
+    Liability,
+    LiabilitySnapshot,
+    LiabilityOverpayment,
+} from './components/liabilities/types';
+export type { Property, Liability, LiabilitySnapshot, LiabilityOverpayment };
+
+// Properties
+export const getProperties = async (): Promise<Property[]> => {
+    const response = await api.get<Property[]>('/liabilities/properties');
+    return response.data;
+};
+
+export const createProperty = async (data: Omit<Property, 'id' | 'createdAt' | 'updatedAt'>): Promise<Property> => {
+    const response = await api.post<Property>('/liabilities/properties', data);
+    return response.data;
+};
+
+export const updateProperty = async (id: string, data: Partial<Omit<Property, 'id' | 'createdAt' | 'updatedAt'>>): Promise<Property> => {
+    const response = await api.put<Property>(`/liabilities/properties/${id}`, data);
+    return response.data;
+};
+
+export const deleteProperty = async (id: string): Promise<void> => {
+    await api.delete(`/liabilities/properties/${id}`);
+};
+
+// Liabilities
+export const getLiabilities = async (): Promise<Liability[]> => {
+    const response = await api.get<Liability[]>('/liabilities');
+    return response.data;
+};
+
+export const createLiability = async (data: Omit<Liability, 'id' | 'property' | 'createdAt' | 'updatedAt'>): Promise<Liability> => {
+    const response = await api.post<Liability>('/liabilities', data);
+    return response.data;
+};
+
+export const updateLiability = async (id: string, data: Partial<Omit<Liability, 'id' | 'property' | 'createdAt' | 'updatedAt'>>): Promise<Liability> => {
+    const response = await api.put<Liability>(`/liabilities/${id}`, data);
+    return response.data;
+};
+
+export const archiveLiability = async (id: string): Promise<Liability> => {
+    const response = await api.post<Liability>(`/liabilities/${id}/archive`);
+    return response.data;
+};
+
+export const deleteLiability = async (id: string): Promise<void> => {
+    await api.delete(`/liabilities/${id}`);
+};
+
+// Snapshots
+export const getLiabilitySnapshots = async (liabilityId?: string): Promise<LiabilitySnapshot[]> => {
+    const params = liabilityId ? { liabilityId } : {};
+    const response = await api.get<LiabilitySnapshot[]>('/liabilities/snapshots', { params });
+    return response.data;
+};
+
+export const saveLiabilitySnapshot = async (data: {
+    liabilityId: string;
+    year: number;
+    month: string;
+    balance: number;
+    interestPaid?: number;
+    paymentMade?: number;
+}): Promise<LiabilitySnapshot> => {
+    const response = await api.post<LiabilitySnapshot>('/liabilities/snapshots', data);
+    return response.data;
+};
+
+export const deleteLiabilitySnapshot = async (id: string): Promise<void> => {
+    await api.delete(`/liabilities/snapshots/${id}`);
+};
+
+// Overpayments
+export const getLiabilityOverpayments = async (liabilityId?: string): Promise<LiabilityOverpayment[]> => {
+    const params = liabilityId ? { liabilityId } : {};
+    const response = await api.get<LiabilityOverpayment[]>('/liabilities/overpayments', { params });
+    return response.data;
+};
+
+export const saveLiabilityOverpayment = async (data: {
+    liabilityId: string;
+    year: number;
+    month: string;
+    amount: number;
+}): Promise<LiabilityOverpayment> => {
+    const response = await api.post<LiabilityOverpayment>('/liabilities/overpayments', data);
+    return response.data;
+};
+
+export const bulkUpsertOverpayments = async (data: {
+    liabilityId: string;
+    recurringOverpayment?: number;
+    overpayments: { liabilityId: string; year: number; month: string; amount: number }[];
+}): Promise<void> => {
+    await api.post('/liabilities/overpayments/bulk', data);
+};
+
+export const deleteLiabilityOverpayment = async (id: string): Promise<void> => {
+    await api.delete(`/liabilities/overpayments/${id}`);
+};
+

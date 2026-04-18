@@ -185,7 +185,7 @@ export const BackupPage: React.FC = () => {
                 </div>
                 <div className="bg-slate-50 px-4 py-2 rounded-lg border border-slate-200">
                     <p className="text-sm font-medium text-slate-600">
-                        Version <span className="text-slate-900 font-bold ml-1">0.3</span>
+                        Version <span className="text-slate-900 font-bold ml-1">0.4</span>
                     </p>
                 </div>
             </div>
