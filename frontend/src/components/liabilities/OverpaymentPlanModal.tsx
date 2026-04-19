@@ -59,8 +59,7 @@ export const OverpaymentPlanModal: React.FC<Props> = ({
     const resetMonth = (key: string) =>
         setGridValues(prev => { const next = { ...prev }; delete next[key]; return next; });
 
-    const effectiveValue = (key: string) =>
-        key in gridValues ? gridValues[key] : recurring !== '' ? recurring : '';
+
 
     const isOverridden = (key: string) => key in gridValues;
 
