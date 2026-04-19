@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsUUID, IsOptional } from 'class-validator';
+import { IsString, IsNumber, IsUUID, IsOptional, IsArray } from 'class-validator';
 
 export class CreateAllocationDto {
     @IsString()
@@ -23,4 +23,10 @@ export class UpdateAllocationDto {
     @IsOptional()
     @IsUUID()
     accountId?: string;
+}
+
+export class ReorderAllocationsDto {
+    @IsArray()
+    @IsUUID(undefined, { each: true })
+    orderedIds: string[];
 }

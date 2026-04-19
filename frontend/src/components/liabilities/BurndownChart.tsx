@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import {
     ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid,
-    Tooltip, ResponsiveContainer, ReferenceLine, Legend,
+    Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts';
 import { clsx } from 'clsx';
-import { type Liability, type LiabilitySnapshot, type LiabilityOverpayment, LIABILITY_TYPE_LABELS } from './types';
+import { type Liability, type LiabilitySnapshot, type LiabilityOverpayment } from './types';
 import { buildBurndownSeries, debtFreeDate, formatMonthKey, type BurndownScope } from '../../utils/burndownUtils';
 
 const fmt = (n: number) =>
@@ -34,16 +34,39 @@ function getLiabilityColor(liability: Liability, index: number): string {
 
 type ViewMode = 'total' | 'stacked';
 
+interface TooltipPayloadEntry { dataKey: string; name: string; value: number; fill?: string; color?: string; payload: { actual: number | null } }
+
+const BurndownTooltip: React.FC<{ active?: boolean; payload?: TooltipPayloadEntry[]; label?: string; viewMode: ViewMode }> = ({ active: tooltipActive, payload, label, viewMode }) => {
+    if (!tooltipActive || !payload?.length) return null;
+    const isProjected = payload[0]?.payload?.actual == null;
+    return (
+        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-lg text-sm min-w-[160px]">
+            <p className="font-semibold text-slate-700 mb-2">{label}</p>
+            {isProjected && <p className="text-xs text-slate-400 italic mb-1">Projected</p>}
+            {viewMode === 'total' ? (
+                <p className="text-rose-600 font-bold">{fmt(payload[0]?.value ?? 0)}</p>
+            ) : (
+                payload
+                    .filter(p => p.dataKey.startsWith('l_'))
+                    .map(p => (
+                        <div key={p.dataKey} className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-1.5">
+                                <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: p.fill ?? p.color }} />
+                                <span className="text-slate-600 truncate max-w-[100px]">{p.name}</span>
+                            </div>
+                            <span className="font-semibold text-slate-800">{fmt(p.value)}</span>
+                        </div>
+                    ))
+            )}
+        </div>
+    );
+};
+
 export const BurndownChart: React.FC<Props> = ({ liabilities, snapshots, overpayments }) => {
     const [scope, setScope] = useState<BurndownScope>('all');
     const [viewMode, setViewMode] = useState<ViewMode>('total');
 
     const active = liabilities.filter(l => !l.archivedAt);
-
-    const scopeOptions = [
-        ...SCOPE_OPTIONS,
-        ...active.map(l => ({ label: l.name, value: l.id })),
-    ];
 
     const series = useMemo(
         () => buildBurndownSeries(active, snapshots, overpayments, scope),
@@ -70,32 +93,6 @@ export const BurndownChart: React.FC<Props> = ({ liabilities, snapshots, overpay
     }));
 
     const hasData = series.length > 0;
-
-    const CustomTooltip = ({ active: tooltipActive, payload, label }: any) => {
-        if (!tooltipActive || !payload?.length) return null;
-        const isProjected = payload[0]?.payload?.actual == null;
-        return (
-            <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-lg text-sm min-w-[160px]">
-                <p className="font-semibold text-slate-700 mb-2">{label}</p>
-                {isProjected && <p className="text-xs text-slate-400 italic mb-1">Projected</p>}
-                {viewMode === 'total' ? (
-                    <p className="text-rose-600 font-bold">{fmt(payload[0]?.value ?? 0)}</p>
-                ) : (
-                    payload
-                        .filter((p: any) => p.dataKey.startsWith('l_'))
-                        .map((p: any) => (
-                            <div key={p.dataKey} className="flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-1.5">
-                                    <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: p.fill || p.color }} />
-                                    <span className="text-slate-600 truncate max-w-[100px]">{p.name}</span>
-                                </div>
-                                <span className="font-semibold text-slate-800">{fmt(p.value)}</span>
-                            </div>
-                        ))
-                )}
-            </div>
-        );
-    };
 
     if (!hasData) {
         return (
@@ -178,7 +175,7 @@ export const BurndownChart: React.FC<Props> = ({ liabilities, snapshots, overpay
                             axisLine={false}
                             width={55}
                         />
-                        <Tooltip content={<CustomTooltip />} />
+                        <Tooltip content={<BurndownTooltip viewMode={viewMode} />} />
 
                         {viewMode === 'total' && (
                             <>

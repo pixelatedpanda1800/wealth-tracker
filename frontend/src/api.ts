@@ -168,6 +168,7 @@ export interface Allocation {
     description: string;
     amount: number;
     accountId: string;
+    sortOrder: number;
     account?: Account;
 }
 
@@ -188,6 +189,10 @@ export const updateAllocation = async (id: string, data: Partial<Omit<Allocation
 
 export const deleteAllocation = async (id: string): Promise<void> => {
     await api.delete(`/budget/allocations/${id}`);
+};
+
+export const reorderAllocations = async (orderedIds: string[]): Promise<void> => {
+    await api.patch('/budget/allocations/reorder', { orderedIds });
 };
 
 // === INVESTMENTS API ===

@@ -140,7 +140,7 @@ export function projectLiability(
     const recurringOverpayment = liability.recurringOverpayment != null ? Number(liability.recurringOverpayment) : 0;
     const annualRatePct = liability.interestRate != null ? Number(liability.interestRate) : 0;
     const monthlyPayment = liability.monthlyPayment != null ? Number(liability.monthlyPayment) : 0;
-    const meta = (liability.typeMetadata as Record<string, any>) ?? {};
+    const meta = (liability.typeMetadata ?? {}) as Record<string, unknown>;
 
     switch (liability.type) {
         case 'mortgage':
@@ -163,8 +163,8 @@ export function projectLiability(
         }
         case 'credit_card':
         case 'overdraft': {
-            const minPaymentPct = meta.minPaymentPct ?? 2;
-            const minPaymentFloor = meta.minPaymentFloor ?? 25;
+            const minPaymentPct = (meta.minPaymentPct as number | undefined) ?? 2;
+            const minPaymentFloor = (meta.minPaymentFloor as number | undefined) ?? 25;
             return projectRevolving({
                 balance,
                 annualRatePct,
@@ -172,15 +172,15 @@ export function projectLiability(
                 minPaymentFloor,
                 recurringOverpayment,
                 monthlyOverrides,
-                promoApr: meta.promoApr,
-                promoEndDate: meta.promoEndDate,
+                promoApr: meta.promoApr as number | undefined,
+                promoEndDate: meta.promoEndDate as string | undefined,
                 startMonth,
                 startYear,
             });
         }
         case 'bnpl': {
-            const instalmentCount = meta.instalmentCount ?? 3;
-            const instalmentsPaid = meta.instalmentsPaid ?? 0;
+            const instalmentCount = (meta.instalmentCount as number | undefined) ?? 3;
+            const instalmentsPaid = (meta.instalmentsPaid as number | undefined) ?? 0;
             return projectBnpl({ balance, instalmentCount, instalmentsPaid, startMonth, startYear });
         }
         case 'student_loan':
@@ -250,7 +250,6 @@ export function buildBurndownSeries(
         const byLiability: Record<string, number> = {};
         let total = 0;
         for (const l of filtered) {
-            const { year, month } = keyToYearMonth(key);
             const snapsAtOrBefore = snapshots.filter(s =>
                 s.liabilityId === l.id &&
                 isoYM(s.year, s.month) <= key

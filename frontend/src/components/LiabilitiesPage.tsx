@@ -13,7 +13,11 @@ import { ManageLiabilitiesModal } from './liabilities/ManageLiabilitiesModal';
 import { AddLiabilityWizard } from './liabilities/AddLiabilityWizard';
 import { AddSnapshotModal } from './liabilities/AddSnapshotModal';
 import { OverpaymentPlanModal } from './liabilities/OverpaymentPlanModal';
-import { type Liability, type LiabilityOverpayment, latestSnapshot, totalOutstanding, LIABILITY_TYPE_LABELS, isSecured } from './liabilities/types';
+import { LiabilityList } from './liabilities/LiabilityList';
+import { BurndownChart } from './liabilities/BurndownChart';
+import { LiabilityBreakdownDonut } from './liabilities/LiabilityBreakdownDonut';
+import { PropertyPanel } from './liabilities/PropertyPanel';
+import { type Liability, type LiabilityOverpayment, latestSnapshot, totalOutstanding, isSecured } from './liabilities/types';
 
 const fmt = (n: number) =>
     '£' + n.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -36,7 +40,6 @@ export const LiabilitiesPage: React.FC = () => {
     const isError = liabilitiesError;
 
     const active = liabilities.filter(l => !l.archivedAt);
-    const archived = liabilities.filter(l => !!l.archivedAt);
     const hasData = active.length > 0;
     const hasSnapshots = snapshots.length > 0;
 
@@ -143,7 +146,7 @@ export const LiabilitiesPage: React.FC = () => {
                     {/* Summary cards */}
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                         {[
-                            { label: 'Total Outstanding', value: fmt(totalDebt), sub: `${active.length} debts`, accent: true },
+                            { label: 'Total Outstanding', value: fmt(totalDebt), sub: `${active.length} debt${active.length !== 1 ? 's' : ''}`, accent: true },
                             { label: 'Secured Debt', value: fmt(securedDebt), sub: 'Mortgage & car' },
                             { label: 'Unsecured Debt', value: fmt(unsecuredDebt), sub: 'Cards, loans & other' },
                             { label: 'Monthly Repayments', value: fmt(monthlyRepayments), sub: 'Scheduled payments' },
@@ -156,71 +159,6 @@ export const LiabilitiesPage: React.FC = () => {
                         ))}
                     </div>
 
-                    {/* Liability list */}
-                    <div className="space-y-3">
-                        <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Active Liabilities</h3>
-                        {active.map(l => {
-                            const snap = latestSnapshot(snapshots, l.id);
-                            const balance = snap ? Number(snap.balance) : null;
-                            const hasOverpaymentPlan = l.recurringOverpayment != null ||
-                                overpayments.some(op => op.liabilityId === l.id);
-
-                            return (
-                                <div key={l.id} className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm flex items-center justify-between gap-4">
-                                    <div className="flex items-center gap-4 min-w-0">
-                                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: l.color ?? '#64748B' }} />
-                                        <div className="min-w-0">
-                                            <p className="font-semibold text-slate-800 truncate">{l.name}</p>
-                                            <div className="flex items-center gap-2 mt-0.5">
-                                                <span className="text-xs text-slate-400 bg-slate-100 rounded-md px-2 py-0.5">
-                                                    {LIABILITY_TYPE_LABELS[l.type as keyof typeof LIABILITY_TYPE_LABELS]}
-                                                </span>
-                                                {l.interestRate != null && (
-                                                    <span className="text-xs text-slate-400">{Number(l.interestRate).toFixed(2)}% APR</span>
-                                                )}
-                                                {hasOverpaymentPlan && (
-                                                    <span className="text-xs text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-0.5">Overpayment plan</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-4 flex-shrink-0">
-                                        {balance != null ? (
-                                            <p className="text-xl font-bold text-slate-800">{fmt(balance)}</p>
-                                        ) : (
-                                            <p className="text-sm text-slate-400 italic">No data</p>
-                                        )}
-                                        <button
-                                            onClick={() => setOverpaymentTarget(l)}
-                                            className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors"
-                                        >
-                                            Plan
-                                        </button>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-
-                    {/* Archived toggle */}
-                    {archived.length > 0 && (
-                        <button onClick={() => setShowArchived(v => !v)} className="text-xs font-medium text-slate-400 hover:text-slate-600 transition-colors">
-                            {showArchived ? '▾' : '▸'} Archived / paid off ({archived.length})
-                        </button>
-                    )}
-                    {showArchived && (
-                        <div className="space-y-2">
-                            {archived.map(l => (
-                                <div key={l.id} className="bg-slate-50 rounded-xl border border-slate-100 px-5 py-3 flex items-center gap-3 opacity-60">
-                                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: l.color ?? '#64748B' }} />
-                                    <span className="text-sm text-slate-500 font-medium">{l.name}</span>
-                                    <span className="text-xs text-slate-400">{LIABILITY_TYPE_LABELS[l.type as keyof typeof LIABILITY_TYPE_LABELS]}</span>
-                                    <span className="ml-auto text-xs text-emerald-600 font-medium">Paid off</span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
                     {/* No snapshot hint */}
                     {!hasSnapshots && (
                         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
@@ -228,6 +166,44 @@ export const LiabilitiesPage: React.FC = () => {
                             <p className="text-sm text-amber-700">No balances recorded yet. Click <strong>Update Balances</strong> to enter your first month's data.</p>
                         </div>
                     )}
+
+                    {/* Charts */}
+                    {hasSnapshots && (
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                            <div className="lg:col-span-2">
+                                <BurndownChart
+                                    liabilities={liabilities}
+                                    snapshots={snapshots}
+                                    overpayments={overpayments}
+                                />
+                            </div>
+                            <div>
+                                <LiabilityBreakdownDonut
+                                    liabilities={liabilities}
+                                    snapshots={snapshots}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Property equity panel */}
+                    {properties.length > 0 && (
+                        <PropertyPanel
+                            properties={properties}
+                            liabilities={liabilities}
+                            snapshots={snapshots}
+                        />
+                    )}
+
+                    {/* Liability list */}
+                    <LiabilityList
+                        liabilities={liabilities}
+                        snapshots={snapshots}
+                        overpayments={overpayments}
+                        onPlan={setOverpaymentTarget}
+                        showArchived={showArchived}
+                        onToggleArchived={() => setShowArchived(v => !v)}
+                    />
                 </div>
             )}
 

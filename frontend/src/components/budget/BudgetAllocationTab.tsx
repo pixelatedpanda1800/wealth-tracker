@@ -1,8 +1,24 @@
-import React, { useState } from 'react';
-import { Settings, Wallet, PiggyBank, Briefcase, Plus, Pencil, Trash2, AlertTriangle, Check, Landmark, ShoppingBag, Loader2, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Settings, Wallet, PiggyBank, Briefcase, Plus, Pencil, Trash2, AlertTriangle, Check, Landmark, ShoppingBag, Loader2, AlertCircle, GripVertical } from 'lucide-react';
 import { clsx } from 'clsx';
 import {
+    DndContext,
+    closestCenter,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+    SortableContext,
+    useSortable,
+    arrayMove,
+    rectSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import {
     deleteAllocation,
+    reorderAllocations,
     type Allocation, type Account
 } from '../../api';
 import { ManageAccountsModal } from './ManageAccountsModal';
@@ -22,6 +38,12 @@ export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ remain
     const error = allocError || accError
         ? 'Failed to load allocation data. Please ensure the backend is running.'
         : null;
+
+    const [localAllocations, setLocalAllocations] = useState<Allocation[]>([]);
+
+    useEffect(() => {
+        setLocalAllocations(allocations);
+    }, [allocations]);
 
     // Modals
     const [isManageAccountsOpen, setIsManageAccountsOpen] = useState(false);
@@ -44,6 +66,21 @@ export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ remain
         }
     };
 
+    const handleReorderPots = async (accountId: string, orderedIds: string[]) => {
+        const reordered = [
+            ...localAllocations.filter(a => a.accountId !== accountId),
+            ...orderedIds.map(id => localAllocations.find(a => a.id === id)!),
+        ];
+        setLocalAllocations(reordered);
+        try {
+            await reorderAllocations(orderedIds);
+            queryClient.invalidateQueries({ queryKey: QueryKeys.allocations });
+        } catch (err) {
+            console.error('Failed to reorder allocations', err);
+            setLocalAllocations(allocations);
+        }
+    };
+
     const openAddAllocationModal = (accountId: string) => {
         setEditingAllocation(null);
         setModalAccountId(accountId);
@@ -57,7 +94,7 @@ export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ remain
     };
 
     // Calculations
-    const totalAllocated = allocations.reduce((sum, a) => sum + Number(a.amount), 0);
+    const totalAllocated = localAllocations.reduce((sum, a) => sum + Number(a.amount), 0);
     const remainingToAllocate = remainingToSpend - totalAllocated;
     const isOverAllocated = remainingToAllocate < 0;
 
@@ -123,45 +160,49 @@ export const BudgetAllocationTab: React.FC<BudgetAllocationTabProps> = ({ remain
                 <AccountCategorySection
                     title="Investment Accounts"
                     accounts={groupedAccounts['investment']}
-                    allocations={allocations}
+                    allocations={localAllocations}
                     color="emerald"
                     icon={<Briefcase className="text-emerald-600" size={20} />}
                     onAddPot={openAddAllocationModal}
                     onEditPot={openEditAllocationModal}
                     onDeletePot={handleDeleteAllocation}
+                    onReorderPots={handleReorderPots}
                 />
 
                 <AccountCategorySection
                     title="Spending Accounts"
                     accounts={groupedAccounts['spending']}
-                    allocations={allocations}
+                    allocations={localAllocations}
                     color="indigo"
                     icon={<Wallet className="text-indigo-600" size={20} />}
                     onAddPot={openAddAllocationModal}
                     onEditPot={openEditAllocationModal}
                     onDeletePot={handleDeleteAllocation}
+                    onReorderPots={handleReorderPots}
                 />
 
                 <AccountCategorySection
                     title="Saving Accounts"
                     accounts={groupedAccounts['saving']}
-                    allocations={allocations}
+                    allocations={localAllocations}
                     color="blue"
                     icon={<PiggyBank className="text-blue-600" size={20} />}
                     onAddPot={openAddAllocationModal}
                     onEditPot={openEditAllocationModal}
                     onDeletePot={handleDeleteAllocation}
+                    onReorderPots={handleReorderPots}
                 />
 
                 <AccountCategorySection
                     title="Outgoings Accounts"
                     accounts={groupedAccounts['outgoings']}
-                    allocations={allocations}
+                    allocations={localAllocations}
                     color="rose"
                     icon={<ShoppingBag className="text-rose-600" size={20} />}
                     onAddPot={openAddAllocationModal}
                     onEditPot={openEditAllocationModal}
                     onDeletePot={handleDeleteAllocation}
+                    onReorderPots={handleReorderPots}
                 />
                 </div>
             )}
@@ -195,10 +236,11 @@ interface AccountCategorySectionProps {
     onAddPot: (accountId: string) => void;
     onEditPot: (pot: Allocation) => void;
     onDeletePot: (potId: string) => void;
+    onReorderPots: (accountId: string, orderedIds: string[]) => void;
 }
 
 const AccountCategorySection: React.FC<AccountCategorySectionProps> = ({
-    title, accounts, allocations, color, icon, onAddPot, onEditPot, onDeletePot
+    title, accounts, allocations, color, icon, onAddPot, onEditPot, onDeletePot, onReorderPots
 }) => {
     if (accounts.length === 0) return null;
 
@@ -235,53 +277,134 @@ const AccountCategorySection: React.FC<AccountCategorySectionProps> = ({
             <div className="divide-y divide-slate-100 bg-slate-50/30">
                 {accounts.map(account => {
                     const accountPots = allocations.filter(a => a.accountId === account.id);
-
                     return (
-                        <div key={account.id} className="p-5">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-3">
-                                    <h4 className="font-bold text-slate-800 flex items-center gap-2">
-                                        <Landmark size={18} className="text-slate-400" />
-                                        {account.name}
-                                    </h4>
-
-                                </div>
-                                <button
-                                    onClick={() => onAddPot(account.id)}
-                                    className="text-xs font-bold text-indigo-600 hover:text-indigo-700 uppercase tracking-wider flex items-center gap-1 bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors border border-indigo-100 hover:border-indigo-200"
-                                >
-                                    <Plus size={12} strokeWidth={3} /> Add Pot
-                                </button>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-
-
-                                {/* Pots */}
-                                {accountPots.map(pot => (
-                                    <div key={pot.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative group hover:border-indigo-200 transition-colors">
-                                        <div className="absolute top-0 left-0 w-1 h-full bg-indigo-400 rounded-l-xl"></div>
-                                        <div className="flex justify-between items-start mb-1">
-                                            <p className="text-sm font-medium text-slate-700 break-words pr-6">{pot.description}</p>
-                                            <div className="flex gap-1 absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={() => onEditPot(pot)} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 rounded">
-                                                    <Pencil size={12} />
-                                                </button>
-                                                <button onClick={() => onDeletePot(pot.id)} className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded">
-                                                    <Trash2 size={12} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <p className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                                            £{Number(pot.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                        </p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                        <AccountPotsGrid
+                            key={account.id}
+                            account={account}
+                            pots={accountPots}
+                            onAddPot={onAddPot}
+                            onEditPot={onEditPot}
+                            onDeletePot={onDeletePot}
+                            onReorderPots={onReorderPots}
+                        />
                     );
                 })}
             </div>
+        </div>
+    );
+};
+
+interface AccountPotsGridProps {
+    account: Account;
+    pots: Allocation[];
+    onAddPot: (accountId: string) => void;
+    onEditPot: (pot: Allocation) => void;
+    onDeletePot: (potId: string) => void;
+    onReorderPots: (accountId: string, orderedIds: string[]) => void;
+}
+
+const AccountPotsGrid: React.FC<AccountPotsGridProps> = ({
+    account, pots, onAddPot, onEditPot, onDeletePot, onReorderPots
+}) => {
+    const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+        const oldIndex = pots.findIndex(p => p.id === active.id);
+        const newIndex = pots.findIndex(p => p.id === over.id);
+        const reordered = arrayMove(pots, oldIndex, newIndex);
+        onReorderPots(account.id, reordered.map(p => p.id));
+    };
+
+    return (
+        <div className="p-5">
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                    <h4 className="font-bold text-slate-800 flex items-center gap-2">
+                        <Landmark size={18} className="text-slate-400" />
+                        {account.name}
+                    </h4>
+                </div>
+                <button
+                    onClick={() => onAddPot(account.id)}
+                    className="text-xs font-bold text-indigo-600 hover:text-indigo-700 uppercase tracking-wider flex items-center gap-1 bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors border border-indigo-100 hover:border-indigo-200"
+                >
+                    <Plus size={12} strokeWidth={3} /> Add Pot
+                </button>
+            </div>
+
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={pots.map(p => p.id)} strategy={rectSortingStrategy}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                        {pots.map(pot => (
+                            <SortablePotCard
+                                key={pot.id}
+                                pot={pot}
+                                onEdit={onEditPot}
+                                onDelete={onDeletePot}
+                            />
+                        ))}
+                    </div>
+                </SortableContext>
+            </DndContext>
+        </div>
+    );
+};
+
+interface SortablePotCardProps {
+    pot: Allocation;
+    onEdit: (pot: Allocation) => void;
+    onDelete: (id: string) => void;
+}
+
+const SortablePotCard: React.FC<SortablePotCardProps> = ({ pot, onEdit, onDelete }) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: pot.id });
+
+    const style: React.CSSProperties = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        zIndex: isDragging ? 10 : undefined,
+        position: 'relative',
+    };
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative group hover:border-indigo-200 transition-colors"
+        >
+            <div className="absolute top-0 left-0 w-1 h-full bg-indigo-400 rounded-l-xl"></div>
+            <div className="flex justify-between items-start mb-1">
+                <p className="text-sm font-medium text-slate-700 break-words pr-6">{pot.description}</p>
+                <div className="flex gap-1 absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                        {...attributes}
+                        {...listeners}
+                        className="p-1 text-slate-300 hover:text-slate-500 hover:bg-slate-50 rounded cursor-grab active:cursor-grabbing"
+                        tabIndex={-1}
+                    >
+                        <GripVertical size={12} />
+                    </button>
+                    <button onClick={() => onEdit(pot)} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 rounded">
+                        <Pencil size={12} />
+                    </button>
+                    <button onClick={() => onDelete(pot.id)} className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded">
+                        <Trash2 size={12} />
+                    </button>
+                </div>
+            </div>
+            <p className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                £{Number(pot.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </p>
         </div>
     );
 };

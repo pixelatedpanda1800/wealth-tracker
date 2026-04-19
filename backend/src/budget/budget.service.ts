@@ -8,7 +8,7 @@ import { Allocation } from './entities/allocation.entity';
 import { CreateIncomeDto, UpdateIncomeDto } from './dto/income.dto';
 import { CreateOutgoingDto, UpdateOutgoingDto } from './dto/outgoing.dto';
 import { CreateAccountDto, UpdateAccountDto } from './dto/account.dto';
-import { CreateAllocationDto, UpdateAllocationDto } from './dto/allocation.dto';
+import { CreateAllocationDto, UpdateAllocationDto, ReorderAllocationsDto } from './dto/allocation.dto';
 
 @Injectable()
 export class BudgetService {
@@ -85,7 +85,7 @@ export class BudgetService {
 
   // === ALLOCATIONS ===
   async findAllAllocations(): Promise<Allocation[]> {
-    return this.allocationRepository.find({ relations: ['account'] });
+    return this.allocationRepository.find({ relations: ['account'], order: { sortOrder: 'ASC' } });
   }
 
   async createAllocation(dto: CreateAllocationDto): Promise<Allocation> {
@@ -100,6 +100,14 @@ export class BudgetService {
 
   async deleteAllocation(id: string): Promise<void> {
     await this.allocationRepository.delete(id);
+  }
+
+  async reorderAllocations(dto: ReorderAllocationsDto): Promise<void> {
+    await Promise.all(
+      dto.orderedIds.map((id, index) =>
+        this.allocationRepository.update(id, { sortOrder: index }),
+      ),
+    );
   }
 
 }
