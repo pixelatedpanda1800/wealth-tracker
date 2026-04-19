@@ -9,6 +9,8 @@ import { IncomeSource } from '../budget/entities/income-source.entity';
 import { OutgoingSource } from '../budget/entities/outgoing-source.entity';
 import { Account } from '../budget/entities/account.entity';
 import { Allocation } from '../budget/entities/allocation.entity';
+import { InvestmentHolding } from '../investments/entities/investment-holding.entity';
+import { InvestmentSnapshot } from '../investments/entities/investment-snapshot.entity';
 import * as fs from 'fs';
 
 jest.mock('fs', () => ({
@@ -48,6 +50,8 @@ describe('BackupService', () => {
         { provide: getRepositoryToken(OutgoingSource), useFactory: mockRepo },
         { provide: getRepositoryToken(Account), useFactory: mockRepo },
         { provide: getRepositoryToken(Allocation), useFactory: mockRepo },
+        { provide: getRepositoryToken(InvestmentHolding), useFactory: mockRepo },
+        { provide: getRepositoryToken(InvestmentSnapshot), useFactory: mockRepo },
         { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile();
@@ -75,6 +79,7 @@ describe('BackupService', () => {
         data: {
           wealth: { sources: [], snapshots: [] },
           budget: { incomes: [], outgoings: [], accounts: [], allocations: [] },
+          investments: { holdings: [], snapshots: [] },
         },
       };
 

@@ -7,6 +7,12 @@ import { IncomeSource } from '../budget/entities/income-source.entity';
 import { OutgoingSource } from '../budget/entities/outgoing-source.entity';
 import { Account } from '../budget/entities/account.entity';
 import { Allocation } from '../budget/entities/allocation.entity';
+import { InvestmentHolding } from '../investments/entities/investment-holding.entity';
+import { InvestmentSnapshot } from '../investments/entities/investment-snapshot.entity';
+import { Property } from '../liabilities/entities/property.entity';
+import { Liability } from '../liabilities/entities/liability.entity';
+import { LiabilitySnapshot } from '../liabilities/entities/liability-snapshot.entity';
+import { LiabilityOverpayment } from '../liabilities/entities/liability-overpayment.entity';
 import { BackupDataDto } from './dto/backup-data.dto';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -26,6 +32,18 @@ export class BackupService {
         private accountRepo: Repository<Account>,
         @InjectRepository(Allocation)
         private allocationRepo: Repository<Allocation>,
+        @InjectRepository(InvestmentHolding)
+        private investmentHoldingRepo: Repository<InvestmentHolding>,
+        @InjectRepository(InvestmentSnapshot)
+        private investmentSnapshotRepo: Repository<InvestmentSnapshot>,
+        @InjectRepository(Property)
+        private propertyRepo: Repository<Property>,
+        @InjectRepository(Liability)
+        private liabilityRepo: Repository<Liability>,
+        @InjectRepository(LiabilitySnapshot)
+        private liabilitySnapshotRepo: Repository<LiabilitySnapshot>,
+        @InjectRepository(LiabilityOverpayment)
+        private liabilityOverpaymentRepo: Repository<LiabilityOverpayment>,
         private dataSource: DataSource,
     ) { }
 
@@ -36,7 +54,13 @@ export class BackupService {
             incomes,
             outgoings,
             accounts,
-            allocations
+            allocations,
+            investmentHoldings,
+            investmentSnapshots,
+            properties,
+            liabilities,
+            liabilitySnapshots,
+            liabilityOverpayments,
         ] = await Promise.all([
             this.wealthSourceRepo.find(),
             this.wealthSnapshotRepo.find(),
@@ -44,6 +68,12 @@ export class BackupService {
             this.outgoingRepo.find(),
             this.accountRepo.find(),
             this.allocationRepo.find(),
+            this.investmentHoldingRepo.find(),
+            this.investmentSnapshotRepo.find(),
+            this.propertyRepo.find(),
+            this.liabilityRepo.find(),
+            this.liabilitySnapshotRepo.find(),
+            this.liabilityOverpaymentRepo.find(),
         ]);
 
         return {
@@ -60,6 +90,16 @@ export class BackupService {
                     accounts: accounts,
                     allocations: allocations,
                 },
+                investments: {
+                    holdings: investmentHoldings,
+                    snapshots: investmentSnapshots,
+                },
+                liabilities: {
+                    properties,
+                    liabilities,
+                    snapshots: liabilitySnapshots,
+                    overpayments: liabilityOverpayments,
+                },
             },
         };
     }
@@ -69,7 +109,13 @@ export class BackupService {
     }
 
     private async clearAllData(manager: EntityManager): Promise<void> {
-        // Reverse order of dependencies
+        // Reverse order of dependencies (children before parents)
+        await manager.createQueryBuilder().delete().from(LiabilityOverpayment).execute();
+        await manager.createQueryBuilder().delete().from(LiabilitySnapshot).execute();
+        await manager.createQueryBuilder().delete().from(Liability).execute();
+        await manager.createQueryBuilder().delete().from(Property).execute();
+        await manager.createQueryBuilder().delete().from(InvestmentSnapshot).execute();
+        await manager.createQueryBuilder().delete().from(InvestmentHolding).execute();
         await manager.createQueryBuilder().delete().from(Allocation).execute();
         await manager.createQueryBuilder().delete().from(Account).execute();
         await manager.createQueryBuilder().delete().from(OutgoingSource).execute();
@@ -107,6 +153,38 @@ export class BackupService {
                 await manager.save(Allocation, allocation);
             }
         }
+        const investments = backup.data.investments;
+        if (investments?.holdings) {
+            for (const holding of investments.holdings) {
+                await manager.save(InvestmentHolding, holding);
+            }
+        }
+        if (investments?.snapshots) {
+            for (const snapshot of investments.snapshots) {
+                await manager.save(InvestmentSnapshot, snapshot);
+            }
+        }
+        const liabilitiesData = (backup.data as any).liabilities;
+        if (liabilitiesData?.properties) {
+            for (const property of liabilitiesData.properties) {
+                await manager.save(Property, property);
+            }
+        }
+        if (liabilitiesData?.liabilities) {
+            for (const liability of liabilitiesData.liabilities) {
+                await manager.save(Liability, liability);
+            }
+        }
+        if (liabilitiesData?.snapshots) {
+            for (const snapshot of liabilitiesData.snapshots) {
+                await manager.save(LiabilitySnapshot, snapshot);
+            }
+        }
+        if (liabilitiesData?.overpayments) {
+            for (const overpayment of liabilitiesData.overpayments) {
+                await manager.save(LiabilityOverpayment, overpayment);
+            }
+        }
     }
 
     async importFullBackup(backup: BackupDataDto): Promise<{
@@ -132,7 +210,8 @@ export class BackupService {
             await this.insertBackupData(backup, manager);
         });
 
-        const { wealth, budget } = backup.data;
+        const { wealth, budget, investments } = backup.data;
+        const liabilitiesData = (backup.data as any).liabilities;
         return {
             success: true,
             message: 'Restore completed successfully. Previous data saved for revert if needed.',
@@ -143,6 +222,12 @@ export class BackupService {
                 outgoings: budget?.outgoings?.length || 0,
                 accounts: budget?.accounts?.length || 0,
                 allocations: budget?.allocations?.length || 0,
+                investmentHoldings: investments?.holdings?.length || 0,
+                investmentSnapshots: investments?.snapshots?.length || 0,
+                liabilityProperties: liabilitiesData?.properties?.length || 0,
+                liabilities: liabilitiesData?.liabilities?.length || 0,
+                liabilitySnapshots: liabilitiesData?.snapshots?.length || 0,
+                liabilityOverpayments: liabilitiesData?.overpayments?.length || 0,
             },
         };
     }

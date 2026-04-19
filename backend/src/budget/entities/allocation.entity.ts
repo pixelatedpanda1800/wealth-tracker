@@ -18,4 +18,7 @@ export class Allocation {
 
     @Column()
     accountId: string;
+
+    @Column({ default: 0 })
+    sortOrder: number;
 }

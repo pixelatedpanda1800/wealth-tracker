@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Param,
   Body,
@@ -11,7 +12,7 @@ import { BudgetService } from './budget.service';
 import { CreateIncomeDto, UpdateIncomeDto } from './dto/income.dto';
 import { CreateOutgoingDto, UpdateOutgoingDto } from './dto/outgoing.dto';
 import { CreateAccountDto, UpdateAccountDto } from './dto/account.dto';
-import { CreateAllocationDto, UpdateAllocationDto } from './dto/allocation.dto';
+import { CreateAllocationDto, UpdateAllocationDto, ReorderAllocationsDto } from './dto/allocation.dto';
 
 @Controller('budget')
 export class BudgetController {
@@ -84,6 +85,11 @@ export class BudgetController {
   @Get('allocations')
   findAllAllocations() {
     return this.budgetService.findAllAllocations();
+  }
+
+  @Patch('allocations/reorder')
+  reorderAllocations(@Body() dto: ReorderAllocationsDto) {
+    return this.budgetService.reorderAllocations(dto);
   }
 
   @Post('allocations')

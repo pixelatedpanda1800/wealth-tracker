@@ -185,7 +185,7 @@ export const BackupPage: React.FC = () => {
                 </div>
                 <div className="bg-slate-50 px-4 py-2 rounded-lg border border-slate-200">
                     <p className="text-sm font-medium text-slate-600">
-                        Version <span className="text-slate-900 font-bold ml-1">0.2</span>
+                        Version <span className="text-slate-900 font-bold ml-1">0.4</span>
                     </p>
                 </div>
             </div>
@@ -227,6 +227,8 @@ export const BackupPage: React.FC = () => {
                                 <li>{importData.data.wealth.snapshots.length} Wealth Snapshots</li>
                                 <li>{importData.data.budget.incomes.length} Income Sources</li>
                                 <li>{importData.data.budget.outgoings.length} Outgoing Sources</li>
+                                <li>{importData.data.investments?.holdings?.length ?? 0} Investment Holdings</li>
+                                <li>{importData.data.investments?.snapshots?.length ?? 0} Investment Snapshots</li>
                             </ul>
                             <div className="pt-4 flex gap-3">
                                 <button

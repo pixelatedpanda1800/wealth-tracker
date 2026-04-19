@@ -12,6 +12,14 @@ import { OutgoingSource } from './budget/entities/outgoing-source.entity';
 import { Account } from './budget/entities/account.entity';
 import { Allocation } from './budget/entities/allocation.entity';
 import { BackupModule } from './backup/backup.module';
+import { InvestmentsModule } from './investments/investments.module';
+import { InvestmentHolding } from './investments/entities/investment-holding.entity';
+import { InvestmentSnapshot } from './investments/entities/investment-snapshot.entity';
+import { LiabilitiesModule } from './liabilities/liabilities.module';
+import { Property } from './liabilities/entities/property.entity';
+import { Liability } from './liabilities/entities/liability.entity';
+import { LiabilitySnapshot } from './liabilities/entities/liability-snapshot.entity';
+import { LiabilityOverpayment } from './liabilities/entities/liability-overpayment.entity';
 
 @Module({
   imports: [
@@ -46,6 +54,12 @@ import { BackupModule } from './backup/backup.module';
               OutgoingSource,
               Account,
               Allocation,
+              InvestmentHolding,
+              InvestmentSnapshot,
+              Property,
+              Liability,
+              LiabilitySnapshot,
+              LiabilityOverpayment,
             ],
             synchronize: true,
           };
@@ -61,6 +75,12 @@ import { BackupModule } from './backup/backup.module';
             OutgoingSource,
             Account,
             Allocation,
+            InvestmentHolding,
+            InvestmentSnapshot,
+            Property,
+            Liability,
+            LiabilitySnapshot,
+            LiabilityOverpayment,
           ],
           synchronize: true,
         };
@@ -68,6 +88,8 @@ import { BackupModule } from './backup/backup.module';
     }),
     WealthModule,
     BudgetModule,
+    InvestmentsModule,
+    LiabilitiesModule,
     BackupModule,
   ],
 })

@@ -27,6 +27,34 @@ class BudgetDataDto {
     allocations: any[];
 }
 
+class InvestmentsDataDto {
+    @IsArray()
+    @IsOptional()
+    holdings: any[];
+
+    @IsArray()
+    @IsOptional()
+    snapshots: any[];
+}
+
+class LiabilitiesDataDto {
+    @IsArray()
+    @IsOptional()
+    properties: any[];
+
+    @IsArray()
+    @IsOptional()
+    liabilities: any[];
+
+    @IsArray()
+    @IsOptional()
+    snapshots: any[];
+
+    @IsArray()
+    @IsOptional()
+    overpayments: any[];
+}
+
 class DataDto {
     @IsObject()
     @ValidateNested()
@@ -38,6 +66,18 @@ class DataDto {
     @Type(() => BudgetDataDto)
     @IsOptional()
     budget: BudgetDataDto;
+
+    @IsObject()
+    @ValidateNested()
+    @Type(() => InvestmentsDataDto)
+    @IsOptional()
+    investments: InvestmentsDataDto;
+
+    @IsObject()
+    @ValidateNested()
+    @Type(() => LiabilitiesDataDto)
+    @IsOptional()
+    liabilities?: LiabilitiesDataDto;
 }
 
 export class BackupDataDto {

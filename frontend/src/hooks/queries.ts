@@ -6,6 +6,12 @@ import {
     getOutgoings,
     getAccounts,
     getAllocations,
+    getInvestmentHoldings,
+    getInvestmentSnapshots,
+    getLiabilities,
+    getLiabilitySnapshots,
+    getLiabilityOverpayments,
+    getProperties,
 } from '../api';
 
 export const QueryKeys = {
@@ -15,6 +21,12 @@ export const QueryKeys = {
     outgoings: ['outgoings'] as const,
     accounts: ['accounts'] as const,
     allocations: ['allocations'] as const,
+    investmentHoldings: ['investmentHoldings'] as const,
+    investmentSnapshots: ['investmentSnapshots'] as const,
+    liabilities: ['liabilities'] as const,
+    liabilitySnapshots: ['liabilitySnapshots'] as const,
+    liabilityOverpayments: ['liabilityOverpayments'] as const,
+    properties: ['properties'] as const,
 };
 
 export const useWealthSnapshots = () =>
@@ -34,5 +46,23 @@ export const useAccounts = () =>
 
 export const useAllocations = () =>
     useQuery({ queryKey: QueryKeys.allocations, queryFn: getAllocations });
+
+export const useInvestmentHoldings = () =>
+    useQuery({ queryKey: QueryKeys.investmentHoldings, queryFn: getInvestmentHoldings });
+
+export const useInvestmentSnapshots = () =>
+    useQuery({ queryKey: QueryKeys.investmentSnapshots, queryFn: () => getInvestmentSnapshots() });
+
+export const useLiabilities = () =>
+    useQuery({ queryKey: QueryKeys.liabilities, queryFn: getLiabilities });
+
+export const useLiabilitySnapshots = () =>
+    useQuery({ queryKey: QueryKeys.liabilitySnapshots, queryFn: () => getLiabilitySnapshots() });
+
+export const useLiabilityOverpayments = () =>
+    useQuery({ queryKey: QueryKeys.liabilityOverpayments, queryFn: () => getLiabilityOverpayments() });
+
+export const useProperties = () =>
+    useQuery({ queryKey: QueryKeys.properties, queryFn: getProperties });
 
 export { useQueryClient };

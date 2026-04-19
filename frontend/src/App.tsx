@@ -11,7 +11,7 @@ import { BackupPage } from './components/BackupPage';
 import type { UserType } from './components/TopBar';
 
 function App() {
-  const [activePage, setActivePage] = useState<PageId>('assets');
+  const [activePage, setActivePage] = useState<PageId>('summary');
   const [userType, setUserType] = useState<UserType>('live');
 
   const renderPage = () => {
@@ -29,7 +29,7 @@ function App() {
       case 'backup':
         return <BackupPage />;
       default:
-        return <AssetTracker />;
+        return <SummaryPage />;
     }
   };
 
