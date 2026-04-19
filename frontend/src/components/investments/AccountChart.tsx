@@ -101,7 +101,7 @@ export const AccountChart: React.FC<AccountChartProps> = ({ source, holdings, sn
                                     boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
                                     backgroundColor: 'rgba(255,255,255,0.95)',
                                 }}
-                                formatter={(value: any, name: string) => [
+                                formatter={(value: any, name: string | number | undefined) => [
                                     `£${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
                                     name,
                                 ]}

@@ -45,7 +45,7 @@ export const OverpaymentPlanModal: React.FC<Props> = ({
     useEffect(() => {
         const init: Record<string, string> = {};
         for (const op of existingOverpayments) {
-            const key = `${op.year}-${String(MONTHS.indexOf(op.month) + 1).padStart(2, '0')}`;
+            const key = `${op.year}-${String(MONTHS.indexOf(op.month as typeof MONTHS[number]) + 1).padStart(2, '0')}`;
             init[key] = String(op.amount);
         }
         setGridValues(init);
@@ -77,7 +77,7 @@ export const OverpaymentPlanModal: React.FC<Props> = ({
             const toUpsert: { liabilityId: string; year: number; month: string; amount: number }[] = [];
             const existingMap = new Map(
                 existingOverpayments.map(op => [
-                    `${op.year}-${String(MONTHS.indexOf(op.month) + 1).padStart(2, '0')}`,
+                    `${op.year}-${String(MONTHS.indexOf(op.month as typeof MONTHS[number]) + 1).padStart(2, '0')}`,
                     op,
                 ])
             );
@@ -115,7 +115,7 @@ export const OverpaymentPlanModal: React.FC<Props> = ({
 
     if (!isOpen) return null;
 
-    const inputCls = 'w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all';
+
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
@@ -154,7 +154,7 @@ export const OverpaymentPlanModal: React.FC<Props> = ({
                         <div className="space-y-1.5">
                             {months.map(({ key, year, month }) => {
                                 const overridden = isOverridden(key);
-                                const val = effectiveValue(key);
+
                                 return (
                                     <div key={key} className={clsx('flex items-center gap-3 px-3 py-2 rounded-lg transition-colors', overridden ? 'bg-amber-50 border border-amber-200' : 'bg-slate-50 border border-slate-100')}>
                                         <span className={clsx('w-20 text-xs font-medium flex-shrink-0', overridden ? 'text-amber-700' : 'text-slate-500')}>

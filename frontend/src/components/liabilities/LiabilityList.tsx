@@ -4,7 +4,7 @@ import { clsx } from 'clsx';
 import { type Liability, type LiabilitySnapshot, type LiabilityOverpayment, LIABILITY_TYPE_LABELS, latestSnapshot } from './types';
 import { projectLiability } from '../../utils/burndownUtils';
 
-type Meta = Record<string, unknown>;
+type Meta = Record<string, any>;
 
 const fmt = (n: number) =>
     '£' + n.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 });

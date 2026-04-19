@@ -70,7 +70,8 @@ export const AllocationModal: React.FC<AllocationModalProps> = ({
             const payload = {
                 description,
                 amount: Number(amount),
-                accountId
+                accountId,
+                sortOrder: editingAllocation ? editingAllocation.sortOrder : 0
             };
 
             if (editingAllocation) {
