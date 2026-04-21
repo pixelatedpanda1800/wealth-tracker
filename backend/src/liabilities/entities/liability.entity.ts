@@ -76,7 +76,7 @@ export class Liability {
   @Column({ type: 'text', nullable: true })
   notes: string;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   archivedAt: Date;
 
   @CreateDateColumn()

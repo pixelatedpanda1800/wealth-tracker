@@ -30,7 +30,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y gnupg2 wget lsb-release && \
     wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - && \
     echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
-    apt-get update && apt-get install -y postgresql-15 supervisor procps && \
+    apt-get update && apt-get install -y postgresql-15 postgresql-client-15 supervisor procps && \
     rm -rf /var/lib/apt/lists/*
 
 # Fix postgresql configuration locations and ensure run dirs exist
@@ -52,7 +52,8 @@ COPY --from=builder-frontend /app/frontend/dist ./client
 # Copy configs and scripts
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh
+COPY start-app.sh /app/start-app.sh
+RUN chmod +x /app/docker-entrypoint.sh /app/start-app.sh
 
 # Persist DB data
 VOLUME /var/lib/postgresql/data
