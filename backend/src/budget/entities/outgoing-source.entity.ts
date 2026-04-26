@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { decimalTransformer } from '../../common/transformers/decimal.transformer';
 
 export type OutgoingType = 'non-negotiable' | 'required' | 'optional' | 'savings';
 export type Frequency = 'monthly' | 'annual';
@@ -17,7 +18,7 @@ export class OutgoingSource {
   @Column({ type: 'varchar', length: 10 })
   frequency: Frequency;
 
-  @Column('decimal', { precision: 12, scale: 2 })
+  @Column('decimal', { precision: 12, scale: 2, transformer: decimalTransformer })
   amount: number;
 
   @Column({ type: 'int', nullable: true })
@@ -28,4 +29,10 @@ export class OutgoingSource {
 
   @Column({ type: 'uuid', nullable: true })
   wealthSourceId: string | null;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 }

@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { decimalTransformer } from '../../common/transformers/decimal.transformer';
 
 @Entity('properties')
 export class Property {
@@ -14,7 +15,7 @@ export class Property {
   @Column()
   name: string;
 
-  @Column('decimal', { precision: 12, scale: 2, nullable: true })
+  @Column('decimal', { precision: 12, scale: 2, nullable: true, transformer: decimalTransformer })
   estimatedValue: number;
 
   @Column({ type: 'date', nullable: true })

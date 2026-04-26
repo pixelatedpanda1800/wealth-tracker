@@ -9,6 +9,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Liability } from './liability.entity';
+import { decimalTransformer } from '../../common/transformers/decimal.transformer';
 
 @Entity('liability_overpayments')
 @Unique(['liabilityId', 'year', 'month'])
@@ -29,7 +30,7 @@ export class LiabilityOverpayment {
   @Column({ length: 3 })
   month: string;
 
-  @Column('decimal', { precision: 12, scale: 2 })
+  @Column('decimal', { precision: 12, scale: 2, transformer: decimalTransformer })
   amount: number;
 
   @CreateDateColumn()

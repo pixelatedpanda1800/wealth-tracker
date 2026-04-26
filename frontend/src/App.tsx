@@ -6,6 +6,7 @@ import { AssetTracker } from './components/AssetTracker';
 import { InvestmentsPage } from './components/InvestmentsPage';
 import { LiabilitiesPage } from './components/LiabilitiesPage';
 import { MonthlyBudgetPage } from './components/MonthlyBudgetPage';
+import { SpendingPage } from './components/SpendingPage';
 import { BackupPage } from './components/BackupPage';
 
 import type { UserType } from './components/TopBar';
@@ -26,6 +27,8 @@ function App() {
         return <LiabilitiesPage />;
       case 'budget':
         return <MonthlyBudgetPage />;
+      case 'spending':
+        return <SpendingPage />;
       case 'backup':
         return <BackupPage />;
       default:

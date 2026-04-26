@@ -2,305 +2,342 @@ import { MONTHS } from './constants';
 import type { Month } from './constants';
 
 export interface WealthEntry {
-    id?: string;
-    month: Month;
-    year: number;
-    values: Record<string, number>;
-    isEstimate?: boolean;
-    // For convenience in calculations
-    total?: number;
-    cash?: number;
-    investment?: number;
-    pension?: number;
+  id?: string;
+  month: Month;
+  year: number;
+  values: Record<string, number>;
+  isEstimate?: boolean;
+  // For convenience in calculations
+  total?: number;
+  cash?: number;
+  investment?: number;
+  pension?: number;
 }
 
 import { type WealthSource } from '../api';
 
 export const getDefaultColor = (index: number) => {
-    const colors = [
-        '#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
-        '#EC4899', '#06B6D4', '#F97316', '#14B8A6', '#64748B'
-    ];
-    return colors[index % colors.length];
+  const colors = [
+    '#6366F1',
+    '#10B981',
+    '#F59E0B',
+    '#EF4444',
+    '#8B5CF6',
+    '#EC4899',
+    '#06B6D4',
+    '#F97316',
+    '#14B8A6',
+    '#64748B',
+  ];
+  return colors[index % colors.length];
 };
 
 export const sortSources = (sources: WealthSource[]) => {
-    return [...sources].sort((a, b) => {
-        const categoryOrder = { cash: 0, investment: 1, pension: 2 };
-        const orderA = categoryOrder[a.category] ?? 3;
-        const orderB = categoryOrder[b.category] ?? 3;
-        if (orderA !== orderB) return orderA - orderB;
-        return a.name.localeCompare(b.name);
-    });
+  return [...sources].sort((a, b) => {
+    const categoryOrder = { cash: 0, investment: 1, pension: 2 };
+    const orderA = categoryOrder[a.category] ?? 3;
+    const orderB = categoryOrder[b.category] ?? 3;
+    if (orderA !== orderB) return orderA - orderB;
+    return a.name.localeCompare(b.name);
+  });
 };
 
 export type ViewMode = 'monthly' | 'quarterly' | 'yearly';
 
-export const processWealthData = (data: WealthEntry[], sources: WealthSource[], mode: ViewMode = 'monthly'): WealthEntry[] => {
-    if (data.length === 0) return [];
+export const processWealthData = (
+  data: WealthEntry[],
+  sources: WealthSource[],
+  mode: ViewMode = 'monthly',
+): WealthEntry[] => {
+  if (data.length === 0) return [];
 
-    // Sort data chronologically
-    const sortedData = [...data].sort((a, b) => {
-        if (a.year !== b.year) return a.year - b.year;
-        return MONTHS.indexOf(a.month) - MONTHS.indexOf(b.month);
+  // Sort data chronologically
+  const sortedData = [...data].sort((a, b) => {
+    if (a.year !== b.year) return a.year - b.year;
+    return MONTHS.indexOf(a.month) - MONTHS.indexOf(b.month);
+  });
+
+  // O(1) lookup: "year-month" -> entry, used in monthly/quarterly/yearly loops
+  const entryMap = new Map<string, WealthEntry>();
+  for (const e of sortedData) {
+    entryMap.set(`${e.year}-${e.month}`, e);
+  }
+
+  // Position of each entry in sortedData, used for backwards carry-forward scan
+  const positionInSorted = new Map<WealthEntry, number>(sortedData.map((e, i) => [e, i]));
+
+  // Pre-computed reverse; avoids allocating a new array per gap-fill call
+  const reversedSortedData = sortedData.slice().reverse();
+
+  // Helper to calculate aggregations for an entry.
+  // If a source is absent from the entry's values (e.g. a partial snapshot
+  // written by the investment tracker that omits cash/pension sources), carry
+  // its value forward from the most recent prior entry that recorded it.
+  const aggregateEntry = (entry: WealthEntry): WealthEntry => {
+    let cash = 0;
+    let investment = 0;
+    let pension = 0;
+
+    // Find position in sortedData so we can scan backwards without allocating
+    // a filtered/reversed array per call
+    const pos =
+      positionInSorted.get(entry) ??
+      sortedData.findIndex((e) => e.year === entry.year && e.month === entry.month);
+
+    sources.forEach((source) => {
+      let value = entry.values?.[source.id];
+
+      if (value == null) {
+        for (let j = pos - 1; j >= 0; j--) {
+          if (sortedData[j].values?.[source.id] != null) {
+            value = sortedData[j].values[source.id];
+            break;
+          }
+        }
+      }
+
+      if (value != null) {
+        if (source.category === 'cash') cash += value;
+        else if (source.category === 'investment') investment += value;
+        else if (source.category === 'pension') pension += value;
+      }
     });
 
-    // Helper to calculate aggregations for an entry.
-    // If a source is absent from the entry's values (e.g. a partial snapshot
-    // written by the investment tracker that omits cash/pension sources), carry
-    // its value forward from the most recent prior entry that recorded it.
-    const aggregateEntry = (entry: WealthEntry): WealthEntry => {
-        let cash = 0;
-        let investment = 0;
-        let pension = 0;
+    return {
+      ...entry,
+      cash,
+      investment,
+      pension,
+      total: cash + investment + pension,
+    };
+  };
 
-        const entryIndex = entry.year * 12 + MONTHS.indexOf(entry.month);
-        // Prior entries sorted most-recent-first for efficient carry-forward lookup
-        const priorEntries = sortedData
-            .filter(e => e.year * 12 + MONTHS.indexOf(e.month) < entryIndex)
-            .reverse();
+  const latestData = sortedData.length > 0 ? sortedData[sortedData.length - 1] : null;
+  const result: WealthEntry[] = [];
 
-        sources.forEach(source => {
-            let value = entry.values?.[source.id];
+  // Determine window end based on current real date
+  const now = new Date();
+  const currentRealMonthIdx = now.getMonth();
+  const currentRealYear = now.getFullYear();
 
-            if (value == null) {
-                // No value recorded for this source this month — find the most
-                // recent prior entry that has one and carry it forward.
-                for (const prior of priorEntries) {
-                    if (prior.values?.[source.id] != null) {
-                        value = prior.values[source.id];
-                        break;
-                    }
-                }
-            }
+  // Helper to get Financial Quarter info
+  // Q1: Apr-Jun, Q2: Jul-Sep, Q3: Oct-Dec, Q4: Jan-Mar
+  const getFinancialQuarter = (monthIdx: number, year: number) => {
+    if (monthIdx >= 3 && monthIdx <= 5) return { q: 1, year }; // Apr-Jun
+    if (monthIdx >= 6 && monthIdx <= 8) return { q: 2, year }; // Jul-Sep
+    if (monthIdx >= 9 && monthIdx <= 11) return { q: 3, year }; // Oct-Dec
+    return { q: 4, year: monthIdx <= 2 ? year - 1 : year }; // Jan-Mar (belongs to prev year's financial cycle)
+  };
 
-            if (value != null) {
-                if (source.category === 'cash') cash += value;
-                else if (source.category === 'investment') investment += value;
-                else if (source.category === 'pension') pension += value;
-            }
+  // Generalized helper to process a target label (month/year or custom label)
+  const processLabel = (
+    existing: WealthEntry | undefined | null,
+    monthLabel: string,
+    year: number,
+    isCustomLabel = false,
+  ) => {
+    if (existing) {
+      const aggregated = aggregateEntry(existing);
+      result.push({
+        ...aggregated,
+        month: (isCustomLabel ? monthLabel : existing.month) as Month, // Override if custom label
+        year: year || existing.year,
+        isEstimate: false,
+      });
+    } else {
+      // Gap filling
+      const lastKnown = result.length > 0 ? result[result.length - 1] : null;
+
+      if (lastKnown && lastKnown.total !== undefined) {
+        result.push({
+          ...lastKnown,
+          month: monthLabel as Month,
+          year: year,
+          isEstimate: true,
+        });
+      } else {
+        // Search before window in sortedData
+        const beforeWindow = reversedSortedData.find((d) => {
+          if (isCustomLabel) return true;
+          return (
+            d.year < year ||
+            (d.year === year && MONTHS.indexOf(d.month) < MONTHS.indexOf(monthLabel as Month))
+          );
         });
 
-        return {
-            ...entry,
-            cash,
-            investment,
-            pension,
-            total: cash + investment + pension
-        };
-    };
+        const fallback = beforeWindow || sortedData[sortedData.length - 1];
 
-    const latestData = sortedData.length > 0 ? sortedData[sortedData.length - 1] : null;
-    const result: WealthEntry[] = [];
-
-    // Determine window end based on current real date
-    const now = new Date();
-    const currentRealMonthIdx = now.getMonth();
-    const currentRealYear = now.getFullYear();
-
-    // Helper to get Financial Quarter info
-    // Q1: Apr-Jun, Q2: Jul-Sep, Q3: Oct-Dec, Q4: Jan-Mar
-    const getFinancialQuarter = (monthIdx: number, year: number) => {
-        if (monthIdx >= 3 && monthIdx <= 5) return { q: 1, year }; // Apr-Jun
-        if (monthIdx >= 6 && monthIdx <= 8) return { q: 2, year }; // Jul-Sep
-        if (monthIdx >= 9 && monthIdx <= 11) return { q: 3, year }; // Oct-Dec
-        return { q: 4, year: monthIdx <= 2 ? year - 1 : year }; // Jan-Mar (belongs to prev year's financial cycle)
-    };
-
-    // Generalized helper to process a target label (month/year or custom label)
-    const processLabel = (
-        existing: WealthEntry | undefined | null,
-        monthLabel: string,
-        year: number,
-        isCustomLabel = false
-    ) => {
-        if (existing) {
-            const aggregated = aggregateEntry(existing);
-            result.push({
-                ...aggregated,
-                month: (isCustomLabel ? monthLabel : existing.month) as Month, // Override if custom label
-                year: year || existing.year,
-                isEstimate: false
-            });
+        if (fallback) {
+          const aggregated = aggregateEntry(fallback);
+          result.push({
+            ...aggregated,
+            month: monthLabel as Month,
+            year: year,
+            isEstimate: true,
+          });
         } else {
-            // Gap filling
-            const lastKnown = result.length > 0 ? result[result.length - 1] : null;
-
-            if (lastKnown && lastKnown.total !== undefined) {
-                result.push({
-                    ...lastKnown,
-                    month: monthLabel as Month,
-                    year: year,
-                    isEstimate: true
-                });
-            } else {
-                // Search before window in sortedData
-                const beforeWindow = [...sortedData].reverse().find(d => {
-                    if (isCustomLabel) return true;
-                    return d.year < year || (d.year === year && MONTHS.indexOf(d.month) < MONTHS.indexOf(monthLabel as Month));
-                });
-
-                const fallback = beforeWindow || sortedData[sortedData.length - 1];
-
-                if (fallback) {
-                    const aggregated = aggregateEntry(fallback);
-                    result.push({
-                        ...aggregated,
-                        month: monthLabel as Month,
-                        year: year,
-                        isEstimate: true
-                    });
-                } else {
-                    result.push({
-                        month: monthLabel as Month,
-                        year: year,
-                        values: {},
-                        cash: 0,
-                        investment: 0,
-                        pension: 0,
-                        total: 0,
-                        isEstimate: true
-                    });
-                }
-            }
+          result.push({
+            month: monthLabel as Month,
+            year: year,
+            values: {},
+            cash: 0,
+            investment: 0,
+            pension: 0,
+            total: 0,
+            isEstimate: true,
+          });
         }
-    };
+      }
+    }
+  };
 
-    if (mode === 'monthly') {
-        let endMonthIdx = currentRealMonthIdx;
-        let endYear = currentRealYear;
+  if (mode === 'monthly') {
+    let endMonthIdx = currentRealMonthIdx;
+    let endYear = currentRealYear;
 
-        if (latestData) {
-            const latestIdx = MONTHS.indexOf(latestData.month);
-            if (latestData.year > endYear || (latestData.year === endYear && latestIdx > endMonthIdx)) {
-                endMonthIdx = latestIdx;
-                endYear = latestData.year;
-            }
-        }
-
-        // Generate 12 labels (trailing 11 months + current target)
-        let currentMonthIdx = endMonthIdx;
-        let currentYear = endYear;
-
-        const targetLabels: { month: Month, year: number }[] = [];
-        for (let i = 0; i < 12; i++) {
-            targetLabels.unshift({ month: MONTHS[currentMonthIdx], year: currentYear });
-            currentMonthIdx--;
-            if (currentMonthIdx < 0) {
-                currentMonthIdx = 11;
-                currentYear--;
-            }
-        }
-
-        targetLabels.forEach(label => {
-            const existing = sortedData.find(d => d.month === label.month && d.year === label.year);
-            processLabel(existing, label.month, label.year);
-        });
-
-    } else if (mode === 'quarterly') {
-        // Show last 8 quarters (2 years)
-        const fq = getFinancialQuarter(currentRealMonthIdx, currentRealYear);
-        let targetQ = fq.q;
-        let targetFY = fq.year;
-
-        if (latestData) {
-            const lIdx = MONTHS.indexOf(latestData.month);
-            const lFq = getFinancialQuarter(lIdx, latestData.year);
-            if (lFq.year > targetFY || (lFq.year === targetFY && lFq.q > targetQ)) {
-                targetQ = lFq.q;
-                targetFY = lFq.year;
-            }
-        }
-
-        const quarters = [];
-        for (let i = 0; i < 8; i++) {
-            quarters.unshift({ q: targetQ, fy: targetFY });
-            targetQ--;
-            if (targetQ < 1) {
-                targetQ = 4;
-                targetFY--;
-            }
-        }
-
-        quarters.forEach(q => {
-            const qMonths = q.q === 4
-                ? [{ m: 0, y: q.fy + 1 }, { m: 1, y: q.fy + 1 }, { m: 2, y: q.fy + 1 }]
-                : [{ m: (q.q - 1) * 3 + 3, y: q.fy }, { m: (q.q - 1) * 3 + 4, y: q.fy }, { m: (q.q - 1) * 3 + 5, y: q.fy }];
-
-            let match = null;
-            for (let i = 2; i >= 0; i--) {
-                const search = qMonths[i];
-                const found = sortedData.find(d => MONTHS.indexOf(d.month) === search.m && d.year === search.y);
-                if (found) {
-                    match = found;
-                    break;
-                }
-            }
-
-            const labelStr = `Q${q.q} FY${q.fy.toString().slice(-2)}`;
-            const calendarYear = q.q === 4 ? q.fy + 1 : q.fy;
-            processLabel(match, labelStr, calendarYear, true);
-        });
-
-    } else if (mode === 'yearly') {
-        // Show last 5 Financial Years
-        let targetFY = getFinancialQuarter(currentRealMonthIdx, currentRealYear).year;
-
-        if (latestData) {
-            const lFq = getFinancialQuarter(MONTHS.indexOf(latestData.month), latestData.year);
-            if (lFq.year > targetFY) targetFY = lFq.year;
-        }
-
-        const years = [];
-        for (let i = 0; i < 5; i++) {
-            years.unshift(targetFY - i);
-        }
-
-        years.forEach(fy => {
-            const candidates = sortedData.filter(d => {
-                const mIndex = MONTHS.indexOf(d.month);
-                if (d.year === fy + 1 && mIndex <= 2) return true; // Jan-Mar next year
-                if (d.year === fy && mIndex >= 3) return true; // Apr-Dec this year
-                return false;
-            });
-
-            const match = candidates.length > 0 ? candidates[candidates.length - 1] : null;
-            processLabel(match, `FY${fy.toString().slice(-2)}/${(fy + 1).toString().slice(-2)}`, fy + 1, true);
-        });
+    if (latestData) {
+      const latestIdx = MONTHS.indexOf(latestData.month);
+      if (latestData.year > endYear || (latestData.year === endYear && latestIdx > endMonthIdx)) {
+        endMonthIdx = latestIdx;
+        endYear = latestData.year;
+      }
     }
 
-    // FILTER: Remove any entries strictly before the earliest recorded data
-    if (sortedData.length > 0) {
-        const earliest = sortedData[0];
-        const earliestTime = earliest.year * 12 + MONTHS.indexOf(earliest.month);
+    // Generate 12 labels (trailing 11 months + current target)
+    let currentMonthIdx = endMonthIdx;
+    let currentYear = endYear;
 
-        return result.filter(d => {
-            let entryTime = 0;
-            if (mode === 'monthly') {
-                entryTime = d.year * 12 + MONTHS.indexOf(d.month as Month);
-            } else if (mode === 'quarterly') {
-                const qMatch = d.month.match(/Q(\d)/);
-                const q = qMatch ? parseInt(qMatch[1]) : 4;
-                const endMonthMap: Record<number, number> = { 1: 5, 2: 8, 3: 11, 4: 2 };
-                entryTime = d.year * 12 + endMonthMap[q];
-            } else if (mode === 'yearly') {
-                entryTime = d.year * 12 + 2; // Ends Mar of d.year (which is next year of FY start)
-            }
-
-            // Show if the period ends on or after the earliest data
-            return entryTime >= earliestTime;
-        });
+    const targetLabels: { month: Month; year: number }[] = [];
+    for (let i = 0; i < 12; i++) {
+      targetLabels.unshift({ month: MONTHS[currentMonthIdx], year: currentYear });
+      currentMonthIdx--;
+      if (currentMonthIdx < 0) {
+        currentMonthIdx = 11;
+        currentYear--;
+      }
     }
 
-    return result;
+    targetLabels.forEach((label) => {
+      const existing = entryMap.get(`${label.year}-${label.month}`);
+      processLabel(existing, label.month, label.year);
+    });
+  } else if (mode === 'quarterly') {
+    // Show last 8 quarters (2 years)
+    const fq = getFinancialQuarter(currentRealMonthIdx, currentRealYear);
+    let targetQ = fq.q;
+    let targetFY = fq.year;
+
+    if (latestData) {
+      const lIdx = MONTHS.indexOf(latestData.month);
+      const lFq = getFinancialQuarter(lIdx, latestData.year);
+      if (lFq.year > targetFY || (lFq.year === targetFY && lFq.q > targetQ)) {
+        targetQ = lFq.q;
+        targetFY = lFq.year;
+      }
+    }
+
+    const quarters = [];
+    for (let i = 0; i < 8; i++) {
+      quarters.unshift({ q: targetQ, fy: targetFY });
+      targetQ--;
+      if (targetQ < 1) {
+        targetQ = 4;
+        targetFY--;
+      }
+    }
+
+    quarters.forEach((q) => {
+      const qMonths =
+        q.q === 4
+          ? [
+              { m: 0, y: q.fy + 1 },
+              { m: 1, y: q.fy + 1 },
+              { m: 2, y: q.fy + 1 },
+            ]
+          : [
+              { m: (q.q - 1) * 3 + 3, y: q.fy },
+              { m: (q.q - 1) * 3 + 4, y: q.fy },
+              { m: (q.q - 1) * 3 + 5, y: q.fy },
+            ];
+
+      let match = null;
+      for (let i = 2; i >= 0; i--) {
+        const search = qMonths[i];
+        const found = entryMap.get(`${search.y}-${MONTHS[search.m]}`);
+        if (found) {
+          match = found;
+          break;
+        }
+      }
+
+      const labelStr = `Q${q.q} FY${q.fy.toString().slice(-2)}`;
+      const calendarYear = q.q === 4 ? q.fy + 1 : q.fy;
+      processLabel(match, labelStr, calendarYear, true);
+    });
+  } else if (mode === 'yearly') {
+    // Show last 5 Financial Years
+    let targetFY = getFinancialQuarter(currentRealMonthIdx, currentRealYear).year;
+
+    if (latestData) {
+      const lFq = getFinancialQuarter(MONTHS.indexOf(latestData.month), latestData.year);
+      if (lFq.year > targetFY) targetFY = lFq.year;
+    }
+
+    const years = [];
+    for (let i = 0; i < 5; i++) {
+      years.unshift(targetFY - i);
+    }
+
+    years.forEach((fy) => {
+      const candidates = sortedData.filter((d) => {
+        const mIndex = MONTHS.indexOf(d.month);
+        if (d.year === fy + 1 && mIndex <= 2) return true; // Jan-Mar next year
+        if (d.year === fy && mIndex >= 3) return true; // Apr-Dec this year
+        return false;
+      });
+
+      const match = candidates.length > 0 ? candidates[candidates.length - 1] : null;
+      processLabel(
+        match,
+        `FY${fy.toString().slice(-2)}/${(fy + 1).toString().slice(-2)}`,
+        fy + 1,
+        true,
+      );
+    });
+  }
+
+  // FILTER: Remove any entries strictly before the earliest recorded data
+  if (sortedData.length > 0) {
+    const earliest = sortedData[0];
+    const earliestTime = earliest.year * 12 + MONTHS.indexOf(earliest.month);
+
+    return result.filter((d) => {
+      let entryTime = 0;
+      if (mode === 'monthly') {
+        entryTime = d.year * 12 + MONTHS.indexOf(d.month as Month);
+      } else if (mode === 'quarterly') {
+        const qMatch = d.month.match(/Q(\d)/);
+        const q = qMatch ? parseInt(qMatch[1]) : 4;
+        const endMonthMap: Record<number, number> = { 1: 5, 2: 8, 3: 11, 4: 2 };
+        entryTime = d.year * 12 + endMonthMap[q];
+      } else if (mode === 'yearly') {
+        entryTime = d.year * 12 + 2; // Ends Mar of d.year (which is next year of FY start)
+      }
+
+      // Show if the period ends on or after the earliest data
+      return entryTime >= earliestTime;
+    });
+  }
+
+  return result;
 };
 
 export type ProjectionTimeline = 'monthly' | 'quarterly' | 'yearly';
 
 export interface ProjectionEntry {
-    label: string;
-    value: number;
-    isProjection: boolean;
+  label: string;
+  value: number;
+  isProjection: boolean;
 }
 
 /**
@@ -308,211 +345,235 @@ export interface ProjectionEntry {
  * Uses a simple linear average of monthly changes.
  */
 export const calculateProjections = (
-    data: WealthEntry[],
-    sources: WealthSource[],
-    timeline: ProjectionTimeline,
-    sourceId?: string // undefined = total wealth
+  data: WealthEntry[],
+  sources: WealthSource[],
+  timeline: ProjectionTimeline,
+  sourceId?: string, // undefined = total wealth
 ): ProjectionEntry[] => {
-    if (data.length === 0) return [];
+  if (data.length === 0) return [];
 
-    // Process the raw data to get aggregated totals
-    const processed = processWealthData(data, sources, 'monthly');
+  // Process the raw data to get aggregated totals
+  const processed = processWealthData(data, sources, 'monthly');
 
-    // Get the value for a specific entry
-    const getValue = (entry: WealthEntry): number => {
-        if (sourceId) {
-            return entry.values?.[sourceId] || 0;
-        }
-        return entry.total || 0;
-    };
+  // Get the value for a specific entry
+  const getValue = (entry: WealthEntry): number => {
+    if (sourceId) {
+      return entry.values?.[sourceId] || 0;
+    }
+    return entry.total || 0;
+  };
 
-    // 1. Filter out leading zeros (before the first real value)
-    // 2. We DO NOT filter out isEstimate so that gaps (which default to flat/previous value) 
-    //    contribute 0 growth to the average, dampening the trend as requested.
-    let firstRealIndex = -1;
-    for (let i = 0; i < processed.length; i++) {
-        if (getValue(processed[i]) > 0 && !processed[i].isEstimate) {
-            firstRealIndex = i;
+  // 1. Filter out leading zeros (before the first real value)
+  // 2. We DO NOT filter out isEstimate so that gaps (which default to flat/previous value)
+  //    contribute 0 growth to the average, dampening the trend as requested.
+  let firstRealIndex = -1;
+  for (let i = 0; i < processed.length; i++) {
+    if (getValue(processed[i]) > 0 && !processed[i].isEstimate) {
+      firstRealIndex = i;
+      break;
+    }
+  }
+
+  // If no real data found, return empty
+  if (firstRealIndex === -1) return [];
+
+  const historyData = processed.slice(firstRealIndex);
+
+  // Calculate monthly changes for the last 12 months (or available history)
+  const changes: number[] = [];
+  const lookbackStart = Math.max(1, historyData.length - 12);
+
+  for (let i = lookbackStart; i < historyData.length; i++) {
+    const prev = getValue(historyData[i - 1]);
+    const curr = getValue(historyData[i]);
+    changes.push(curr - prev);
+  }
+
+  // Calculate projected growth using a mathematically robust method:
+  // Median Absolute Deviation (MAD) Outlier Rejection.
+  // This allows us to find the "typical" average by gracefully filtering out
+  // dramatic one-off deposits (like a house purchase) or one-off drops (market crash)
+  // without manual thresholds.
+
+  let avgMonthlyGrowth = 0;
+
+  if (changes.length > 0) {
+    if (changes.length < 4) {
+      // Not enough data points to do meaningful outlier detection
+      // just fallback to an absolute simple average.
+      const totalChange = changes.reduce((sum, val) => sum + val, 0);
+      avgMonthlyGrowth = totalChange / changes.length;
+    } else {
+      // 1. Calculate the Median
+      const sortedChanges = [...changes].sort((a, b) => a - b);
+      const getMedian = (arr: number[]) => {
+        const mid = Math.floor(arr.length / 2);
+        return arr.length % 2 !== 0 ? arr[mid] : (arr[mid - 1] + arr[mid]) / 2;
+      };
+      const medianChange = getMedian(sortedChanges);
+
+      // 2. Calculate the Median Absolute Deviation (MAD)
+      const deviations = changes.map((val) => Math.abs(val - medianChange));
+      deviations.sort((a, b) => a - b);
+      const mad = getMedian(deviations);
+
+      // 3. Define the bound configuration.
+      // We use 2 * MAD which is a strict threshold suitable for highly volatile data
+      // to exclude everything but the core baseline changes.
+      // If mad is 0 (lots of identical values), ensure threshold is slightly > 0
+      const threshold = mad === 0 ? 1 : mad * 2;
+
+      // 4. Filter the changes to keep ONLY the organic, non-outlier changes
+      const validChanges = changes.filter((val) => {
+        return Math.abs(val - medianChange) <= threshold;
+      });
+
+      // 5. Average the remaining valid changes to deduce realistic periodic trajectory
+      if (validChanges.length > 0) {
+        const totalValid = validChanges.reduce((sum, val) => sum + val, 0);
+        avgMonthlyGrowth = totalValid / validChanges.length;
+      } else {
+        // Fallback if filtering removed absolutely everything
+        avgMonthlyGrowth = medianChange;
+      }
+    }
+  }
+
+  const now = new Date();
+  const currentMonthIdx = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  const result: ProjectionEntry[] = [];
+  const latestValue = getValue(historyData[historyData.length - 1]);
+  const latestEntry = historyData[historyData.length - 1];
+  const latestMonthIdx = MONTHS.indexOf(latestEntry.month);
+  const latestYear = latestEntry.year;
+
+  if (timeline === 'monthly') {
+    // -2 months history + current + 12 months future
+    let startMonthIdx = currentMonthIdx - 2;
+    let startYear = currentYear;
+    if (startMonthIdx < 0) {
+      startMonthIdx += 12;
+      startYear--;
+    }
+
+    for (let i = 0; i < 15; i++) {
+      // 2 past + 1 current + 12 future
+      let mIdx = startMonthIdx + i;
+      let y = startYear;
+      while (mIdx > 11) {
+        mIdx -= 12;
+        y++;
+      }
+
+      const label = `${MONTHS[mIdx]} '${y.toString().slice(-2)}`;
+      const isCurrentOrPast = y < currentYear || (y === currentYear && mIdx <= currentMonthIdx);
+
+      // Try to find actual data
+      const found = processed.find(
+        (d) => MONTHS.indexOf(d.month) === mIdx && d.year === y && !d.isEstimate,
+      );
+      if (found) {
+        result.push({ label, value: getValue(found), isProjection: false });
+      } else if (isCurrentOrPast) {
+        // Forward fill from last known
+        const lastKnown = result.length > 0 ? result[result.length - 1].value : latestValue;
+        result.push({ label, value: lastKnown, isProjection: false });
+      } else {
+        // Calculate projection
+        const monthsFromLatest = (y - latestYear) * 12 + (mIdx - latestMonthIdx);
+        const projected = latestValue + avgMonthlyGrowth * monthsFromLatest;
+        result.push({ label, value: Math.max(0, projected), isProjection: true });
+      }
+    }
+  } else if (timeline === 'quarterly') {
+    // -1 quarter history + current + 5 years future (20 quarters)
+    const getQuarter = (mIdx: number) => Math.floor(mIdx / 3) + 1;
+    const currentQ = getQuarter(currentMonthIdx);
+
+    let startQ = currentQ - 1;
+    let startY = currentYear;
+    if (startQ < 1) {
+      startQ = 4;
+      startY--;
+    }
+
+    for (let i = 0; i < 22; i++) {
+      // 1 past + 1 current + 20 future
+      let q = startQ + i;
+      let y = startY;
+      while (q > 4) {
+        q -= 4;
+        y++;
+      }
+
+      const label = `Q${q} '${y.toString().slice(-2)}`;
+      const qEndMonth = q * 3 - 1; // Q1->2 (Mar), Q2->5 (Jun), etc
+      const isCurrentOrPast =
+        y < currentYear || (y === currentYear && qEndMonth <= currentMonthIdx);
+
+      if (isCurrentOrPast) {
+        // Find last month of quarter in actual data
+        const qMonths = [q * 3 - 3, q * 3 - 2, q * 3 - 1];
+        let found = null;
+        for (let j = 2; j >= 0; j--) {
+          const check = processed.find(
+            (d) => MONTHS.indexOf(d.month) === qMonths[j] && d.year === y && !d.isEstimate,
+          );
+          if (check) {
+            found = check;
             break;
+          }
         }
-    }
-
-    // If no real data found, return empty
-    if (firstRealIndex === -1) return [];
-
-    const historyData = processed.slice(firstRealIndex);
-
-    // Calculate monthly changes for the last 12 months (or available history)
-    const changes: number[] = [];
-    const lookbackStart = Math.max(1, historyData.length - 12);
-
-    for (let i = lookbackStart; i < historyData.length; i++) {
-        const prev = getValue(historyData[i - 1]);
-        const curr = getValue(historyData[i]);
-        changes.push(curr - prev);
-    }
-
-    // Calculate projected growth using a mathematically robust method:
-    // Median Absolute Deviation (MAD) Outlier Rejection.
-    // This allows us to find the "typical" average by gracefully filtering out
-    // dramatic one-off deposits (like a house purchase) or one-off drops (market crash)
-    // without manual thresholds.
-
-    let avgMonthlyGrowth = 0;
-
-    if (changes.length > 0) {
-        if (changes.length < 4) {
-             // Not enough data points to do meaningful outlier detection 
-             // just fallback to an absolute simple average.
-             const totalChange = changes.reduce((sum, val) => sum + val, 0);
-             avgMonthlyGrowth = totalChange / changes.length;
+        if (found) {
+          result.push({ label, value: getValue(found), isProjection: false });
         } else {
-             // 1. Calculate the Median
-             const sortedChanges = [...changes].sort((a, b) => a - b);
-             const getMedian = (arr: number[]) => {
-                 const mid = Math.floor(arr.length / 2);
-                 return arr.length % 2 !== 0 ? arr[mid] : (arr[mid - 1] + arr[mid]) / 2;
-             };
-             const medianChange = getMedian(sortedChanges);
-
-             // 2. Calculate the Median Absolute Deviation (MAD)
-             const deviations = changes.map(val => Math.abs(val - medianChange));
-             deviations.sort((a, b) => a - b);
-             const mad = getMedian(deviations);
-
-             // 3. Define the bound configuration. 
-             // We use 2 * MAD which is a strict threshold suitable for highly volatile data 
-             // to exclude everything but the core baseline changes. 
-             // If mad is 0 (lots of identical values), ensure threshold is slightly > 0
-             const threshold = mad === 0 ? 1 : mad * 2;
-             
-             // 4. Filter the changes to keep ONLY the organic, non-outlier changes
-             const validChanges = changes.filter(val => {
-                 return Math.abs(val - medianChange) <= threshold;
-             });
-
-             // 5. Average the remaining valid changes to deduce realistic periodic trajectory
-             if (validChanges.length > 0) {
-                 const totalValid = validChanges.reduce((sum, val) => sum + val, 0);
-                 avgMonthlyGrowth = totalValid / validChanges.length;
-             } else {
-                 // Fallback if filtering removed absolutely everything
-                 avgMonthlyGrowth = medianChange;
-             }
+          const lastKnown = result.length > 0 ? result[result.length - 1].value : latestValue;
+          result.push({ label, value: lastKnown, isProjection: false });
         }
+      } else {
+        const monthsFromLatest = (y - latestYear) * 12 + (qEndMonth - latestMonthIdx);
+        const projected = latestValue + avgMonthlyGrowth * monthsFromLatest;
+        result.push({ label, value: Math.max(0, projected), isProjection: true });
+      }
     }
+  } else if (timeline === 'yearly') {
+    // -1 year history + current + 10 years future
+    for (let i = -1; i <= 10; i++) {
+      const y = currentYear + i;
+      const label = `${y}`;
+      const isCurrentOrPast = y <= currentYear;
 
-    const now = new Date();
-    const currentMonthIdx = now.getMonth();
-    const currentYear = now.getFullYear();
-
-    const result: ProjectionEntry[] = [];
-    const latestValue = getValue(historyData[historyData.length - 1]);
-    const latestEntry = historyData[historyData.length - 1];
-    const latestMonthIdx = MONTHS.indexOf(latestEntry.month);
-    const latestYear = latestEntry.year;
-
-    if (timeline === 'monthly') {
-        // -2 months history + current + 12 months future
-        let startMonthIdx = currentMonthIdx - 2;
-        let startYear = currentYear;
-        if (startMonthIdx < 0) {
-            startMonthIdx += 12;
-            startYear--;
+      if (isCurrentOrPast) {
+        // Find Dec of that year (or latest if current year)
+        const targetMonth = y === currentYear ? currentMonthIdx : 11;
+        let found = null;
+        for (let mIdx = targetMonth; mIdx >= 0; mIdx--) {
+          const check = processed.find(
+            (d) => MONTHS.indexOf(d.month) === mIdx && d.year === y && !d.isEstimate,
+          );
+          if (check) {
+            found = check;
+            break;
+          }
         }
-
-        for (let i = 0; i < 15; i++) { // 2 past + 1 current + 12 future
-            let mIdx = startMonthIdx + i;
-            let y = startYear;
-            while (mIdx > 11) { mIdx -= 12; y++; }
-
-            const label = `${MONTHS[mIdx]} '${y.toString().slice(-2)}`;
-            const isCurrentOrPast = y < currentYear || (y === currentYear && mIdx <= currentMonthIdx);
-
-            // Try to find actual data
-            const found = processed.find(d => MONTHS.indexOf(d.month) === mIdx && d.year === y && !d.isEstimate);
-            if (found) {
-                result.push({ label, value: getValue(found), isProjection: false });
-            } else if (isCurrentOrPast) {
-                // Forward fill from last known
-                const lastKnown = result.length > 0 ? result[result.length - 1].value : latestValue;
-                result.push({ label, value: lastKnown, isProjection: false });
-            } else {
-                // Calculate projection
-                const monthsFromLatest = (y - latestYear) * 12 + (mIdx - latestMonthIdx);
-                const projected = latestValue + (avgMonthlyGrowth * monthsFromLatest);
-                result.push({ label, value: Math.max(0, projected), isProjection: true });
-            }
+        if (found) {
+          result.push({ label, value: getValue(found), isProjection: false });
+        } else {
+          const lastKnown = result.length > 0 ? result[result.length - 1].value : latestValue;
+          result.push({ label, value: lastKnown, isProjection: false });
         }
-    } else if (timeline === 'quarterly') {
-        // -1 quarter history + current + 5 years future (20 quarters)
-        const getQuarter = (mIdx: number) => Math.floor(mIdx / 3) + 1;
-        const currentQ = getQuarter(currentMonthIdx);
-
-        let startQ = currentQ - 1;
-        let startY = currentYear;
-        if (startQ < 1) { startQ = 4; startY--; }
-
-        for (let i = 0; i < 22; i++) { // 1 past + 1 current + 20 future
-            let q = startQ + i;
-            let y = startY;
-            while (q > 4) { q -= 4; y++; }
-
-            const label = `Q${q} '${y.toString().slice(-2)}`;
-            const qEndMonth = q * 3 - 1; // Q1->2 (Mar), Q2->5 (Jun), etc
-            const isCurrentOrPast = y < currentYear || (y === currentYear && qEndMonth <= currentMonthIdx);
-
-            if (isCurrentOrPast) {
-                // Find last month of quarter in actual data
-                const qMonths = [q * 3 - 3, q * 3 - 2, q * 3 - 1];
-                let found = null;
-                for (let j = 2; j >= 0; j--) {
-                    const check = processed.find(d => MONTHS.indexOf(d.month) === qMonths[j] && d.year === y && !d.isEstimate);
-                    if (check) { found = check; break; }
-                }
-                if (found) {
-                    result.push({ label, value: getValue(found), isProjection: false });
-                } else {
-                    const lastKnown = result.length > 0 ? result[result.length - 1].value : latestValue;
-                    result.push({ label, value: lastKnown, isProjection: false });
-                }
-            } else {
-                const monthsFromLatest = (y - latestYear) * 12 + (qEndMonth - latestMonthIdx);
-                const projected = latestValue + (avgMonthlyGrowth * monthsFromLatest);
-                result.push({ label, value: Math.max(0, projected), isProjection: true });
-            }
-        }
-    } else if (timeline === 'yearly') {
-        // -1 year history + current + 10 years future
-        for (let i = -1; i <= 10; i++) {
-            const y = currentYear + i;
-            const label = `${y}`;
-            const isCurrentOrPast = y <= currentYear;
-
-            if (isCurrentOrPast) {
-                // Find Dec of that year (or latest if current year)
-                const targetMonth = y === currentYear ? currentMonthIdx : 11;
-                let found = null;
-                for (let mIdx = targetMonth; mIdx >= 0; mIdx--) {
-                    const check = processed.find(d => MONTHS.indexOf(d.month) === mIdx && d.year === y && !d.isEstimate);
-                    if (check) { found = check; break; }
-                }
-                if (found) {
-                    result.push({ label, value: getValue(found), isProjection: false });
-                } else {
-                    const lastKnown = result.length > 0 ? result[result.length - 1].value : latestValue;
-                    result.push({ label, value: lastKnown, isProjection: false });
-                }
-            } else {
-                // Calculate projection
-                // Use the same month as the latest data for yearly intervals (12-month)
-                // instead of jumping to December (which could be 23 months if latest is Jan)
-                const monthsFromLatest = (y - latestYear) * 12;
-                const projected = latestValue + (avgMonthlyGrowth * monthsFromLatest);
-                result.push({ label, value: Math.max(0, projected), isProjection: true });
-            }
-        }
+      } else {
+        // Calculate projection
+        // Use the same month as the latest data for yearly intervals (12-month)
+        // instead of jumping to December (which could be 23 months if latest is Jan)
+        const monthsFromLatest = (y - latestYear) * 12;
+        const projected = latestValue + avgMonthlyGrowth * monthsFromLatest;
+        result.push({ label, value: Math.max(0, projected), isProjection: true });
+      }
     }
+  }
 
-    return result;
+  return result;
 };

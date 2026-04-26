@@ -11,6 +11,10 @@ import { Account } from '../budget/entities/account.entity';
 import { Allocation } from '../budget/entities/allocation.entity';
 import { InvestmentHolding } from '../investments/entities/investment-holding.entity';
 import { InvestmentSnapshot } from '../investments/entities/investment-snapshot.entity';
+import { Property } from '../liabilities/entities/property.entity';
+import { Liability } from '../liabilities/entities/liability.entity';
+import { LiabilitySnapshot } from '../liabilities/entities/liability-snapshot.entity';
+import { LiabilityOverpayment } from '../liabilities/entities/liability-overpayment.entity';
 import * as fs from 'fs';
 
 jest.mock('fs', () => ({
@@ -52,6 +56,10 @@ describe('BackupService', () => {
         { provide: getRepositoryToken(Allocation), useFactory: mockRepo },
         { provide: getRepositoryToken(InvestmentHolding), useFactory: mockRepo },
         { provide: getRepositoryToken(InvestmentSnapshot), useFactory: mockRepo },
+        { provide: getRepositoryToken(Property), useFactory: mockRepo },
+        { provide: getRepositoryToken(Liability), useFactory: mockRepo },
+        { provide: getRepositoryToken(LiabilitySnapshot), useFactory: mockRepo },
+        { provide: getRepositoryToken(LiabilityOverpayment), useFactory: mockRepo },
         { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile();
@@ -74,12 +82,13 @@ describe('BackupService', () => {
       (mockDataSource.transaction as jest.Mock).mockResolvedValue(undefined);
 
       const payload = {
-        version: 1,
+        version: 2,
         timestamp: new Date().toISOString(),
         data: {
           wealth: { sources: [], snapshots: [] },
           budget: { incomes: [], outgoings: [], accounts: [], allocations: [] },
           investments: { holdings: [], snapshots: [] },
+          liabilities: { properties: [], liabilities: [], snapshots: [], overpayments: [] },
         },
       };
 

@@ -77,7 +77,7 @@ export class BackupService {
         ]);
 
         return {
-            version: 1,
+            version: 2,
             timestamp: new Date().toISOString(),
             data: {
                 wealth: {
@@ -127,64 +127,23 @@ export class BackupService {
     private async insertBackupData(backup: BackupDataDto, manager: EntityManager): Promise<void> {
         const { wealth, budget } = backup.data;
 
-        for (const source of wealth.sources) {
-            await manager.save(WealthSource, source);
-        }
-        for (const snapshot of wealth.snapshots) {
-            await manager.save(WealthSnapshot, snapshot);
-        }
-        if (budget?.incomes) {
-            for (const income of budget.incomes) {
-                await manager.save(IncomeSource, income);
-            }
-        }
-        if (budget?.outgoings) {
-            for (const outgoing of budget.outgoings) {
-                await manager.save(OutgoingSource, outgoing);
-            }
-        }
-        if (budget?.accounts) {
-            for (const account of budget.accounts) {
-                await manager.save(Account, account);
-            }
-        }
-        if (budget?.allocations) {
-            for (const allocation of budget.allocations) {
-                await manager.save(Allocation, allocation);
-            }
-        }
+        if (wealth.sources.length) await manager.insert(WealthSource, wealth.sources);
+        if (wealth.snapshots.length) await manager.insert(WealthSnapshot, wealth.snapshots);
+
+        if (budget?.incomes?.length) await manager.insert(IncomeSource, budget.incomes);
+        if (budget?.outgoings?.length) await manager.insert(OutgoingSource, budget.outgoings);
+        if (budget?.accounts?.length) await manager.insert(Account, budget.accounts);
+        if (budget?.allocations?.length) await manager.insert(Allocation, budget.allocations);
+
         const investments = backup.data.investments;
-        if (investments?.holdings) {
-            for (const holding of investments.holdings) {
-                await manager.save(InvestmentHolding, holding);
-            }
-        }
-        if (investments?.snapshots) {
-            for (const snapshot of investments.snapshots) {
-                await manager.save(InvestmentSnapshot, snapshot);
-            }
-        }
-        const liabilitiesData = (backup.data as any).liabilities;
-        if (liabilitiesData?.properties) {
-            for (const property of liabilitiesData.properties) {
-                await manager.save(Property, property);
-            }
-        }
-        if (liabilitiesData?.liabilities) {
-            for (const liability of liabilitiesData.liabilities) {
-                await manager.save(Liability, liability);
-            }
-        }
-        if (liabilitiesData?.snapshots) {
-            for (const snapshot of liabilitiesData.snapshots) {
-                await manager.save(LiabilitySnapshot, snapshot);
-            }
-        }
-        if (liabilitiesData?.overpayments) {
-            for (const overpayment of liabilitiesData.overpayments) {
-                await manager.save(LiabilityOverpayment, overpayment);
-            }
-        }
+        if (investments?.holdings?.length) await manager.insert(InvestmentHolding, investments.holdings);
+        if (investments?.snapshots?.length) await manager.insert(InvestmentSnapshot, investments.snapshots);
+
+        const liabilitiesData = backup.data.liabilities;
+        if (liabilitiesData?.properties?.length) await manager.insert(Property, liabilitiesData.properties);
+        if (liabilitiesData?.liabilities?.length) await manager.insert(Liability, liabilitiesData.liabilities);
+        if (liabilitiesData?.snapshots?.length) await manager.insert(LiabilitySnapshot, liabilitiesData.snapshots);
+        if (liabilitiesData?.overpayments?.length) await manager.insert(LiabilityOverpayment, liabilitiesData.overpayments);
     }
 
     async importFullBackup(backup: BackupDataDto): Promise<{
@@ -210,8 +169,7 @@ export class BackupService {
             await this.insertBackupData(backup, manager);
         });
 
-        const { wealth, budget, investments } = backup.data;
-        const liabilitiesData = (backup.data as any).liabilities;
+        const { wealth, budget, investments, liabilities: liabilitiesData } = backup.data;
         return {
             success: true,
             message: 'Restore completed successfully. Previous data saved for revert if needed.',

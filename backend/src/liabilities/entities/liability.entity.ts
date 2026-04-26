@@ -8,6 +8,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Property } from './property.entity';
+import { decimalTransformer } from '../../common/transformers/decimal.transformer';
 
 export enum LiabilityType {
   MORTGAGE = 'mortgage',
@@ -46,19 +47,19 @@ export class Liability {
   @Column({ type: 'date', nullable: true })
   startDate: string;
 
-  @Column('decimal', { precision: 12, scale: 2, nullable: true })
+  @Column('decimal', { precision: 12, scale: 2, nullable: true, transformer: decimalTransformer })
   originalPrincipal: number;
 
-  @Column('decimal', { precision: 6, scale: 3, nullable: true })
+  @Column('decimal', { precision: 6, scale: 3, nullable: true, transformer: decimalTransformer })
   interestRate: number;
 
-  @Column('decimal', { precision: 12, scale: 2, nullable: true })
+  @Column('decimal', { precision: 12, scale: 2, nullable: true, transformer: decimalTransformer })
   monthlyPayment: number;
 
-  @Column('decimal', { precision: 12, scale: 2, nullable: true })
+  @Column('decimal', { precision: 12, scale: 2, nullable: true, transformer: decimalTransformer })
   recurringOverpayment: number;
 
-  @Column('decimal', { precision: 12, scale: 2, nullable: true })
+  @Column('decimal', { precision: 12, scale: 2, nullable: true, transformer: decimalTransformer })
   creditLimit: number;
 
   @Column({ nullable: true })

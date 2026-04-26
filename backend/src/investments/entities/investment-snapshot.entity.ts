@@ -9,6 +9,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { InvestmentHolding } from './investment-holding.entity';
+import { decimalTransformer } from '../../common/transformers/decimal.transformer';
 
 @Entity('investment_snapshots')
 @Unique(['holdingId', 'year', 'month'])
@@ -29,13 +30,13 @@ export class InvestmentSnapshot {
   @Column({ length: 3 })
   month: string;
 
-  @Column('decimal', { precision: 14, scale: 4, nullable: true })
+  @Column('decimal', { precision: 14, scale: 4, nullable: true, transformer: decimalTransformer })
   units: number;
 
-  @Column('decimal', { precision: 12, scale: 2, nullable: true })
+  @Column('decimal', { precision: 12, scale: 2, nullable: true, transformer: decimalTransformer })
   costBasis: number;
 
-  @Column('decimal', { precision: 12, scale: 2 })
+  @Column('decimal', { precision: 12, scale: 2, transformer: decimalTransformer })
   value: number;
 
   @CreateDateColumn()
